@@ -1500,23 +1500,7 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
               onMouseLeave={e => { if (!item.pinned) { e.target.style.color = theme.textGhost; e.target.style.background = "none"; } }}
               title={item.pinned ? "Unpin" : "Pin to top"}
             >{item.pinned ? "Pinned" : "Pin"}</button>
-            {item.image && !item.ocrData && (
-              <button
-                onClick={() => onScanCard(item.id)}
-                disabled={isScanning}
-                style={{
-                  background: "none", border: "none",
-                  color: isScanning ? theme.textMuted : theme.textGhost,
-                  cursor: isScanning ? "wait" : "pointer",
-                  fontSize: "11px", padding: "4px 8px",
-                  borderRadius: "6px", transition: "all 0.25s ease",
-                  fontFamily: "'DM Sans', sans-serif", fontWeight: 500,
-                  animation: isScanning ? "gentlePulse 1.5s ease infinite" : "none",
-                }}
-                onMouseEnter={e => { if (!isScanning) { e.target.style.color = theme.textMuted; e.target.style.background = theme.hoverBg; } }}
-                onMouseLeave={e => { if (!isScanning) { e.target.style.color = theme.textGhost; e.target.style.background = "none"; } }}
-              >{isScanning ? "Scanning…" : "Scan"}</button>
-            )}
+                       )}
             <button
               onClick={() => onDelete(item.id)}
               style={{
@@ -1846,25 +1830,7 @@ function Stash() {
     ));
   };
 
-  // Scan business card with OCR
-  const [scanningId, setScanningId] = useState(null);
-  const scanBusinessCard = async (id) => {
-    const item = items.find(i => i.id === id);
-    if (!item?.image) return;
-    
-    setScanningId(id);
-    const cardData = await extractBusinessCard(item.image);
-    setScanningId(null);
-    
-    if (cardData) {
-      const formatted = formatCardInfo(cardData);
-      const newTags = [...(item.tags || [])];
-      if (!newTags.includes("business-card")) newTags.push("business-card");
-      if (cardData.company && !newTags.includes(cardData.company.toLowerCase())) {
-        newTags.push(cardData.company.toLowerCase().replace(/\s+/g, "-"));
-      }
-      
-      editItem(id, {
+        editItem(id, {
         content: formatted,
         type: "contact",
         tags: newTags,
