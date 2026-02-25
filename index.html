@@ -408,44 +408,25 @@ const compressImage = (dataUrl, maxWidth = 800) =>
 // We send the image as base64 and ask Claude to respond with
 // JSON so we can parse it cleanly.
 // ============================================================
+const BACKEND_URL = stash-server-production-1c71.up.railway.app;
+
 const extractBusinessCard = async (imageDataUrl) => {
   try {
-    const base64Data = imageDataUrl.split(",")[1];
-    const mediaType = imageDataUrl.split(";")[0].split(":")[1] || "image/jpeg";
-    
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch(`${BACKEND_URL}/api/ocr`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        messages: [{
-          role: "user",
-          content: [
-            {
-              type: "image",
-              source: { type: "base64", media_type: mediaType, data: base64Data },
-            },
-            {
-              type: "text",
-              text: `Analyze this business card image. Extract all contact information and return ONLY a JSON object with these fields (use null for missing fields):
-{"name": "", "title": "", "company": "", "phone": "", "email": "", "website": "", "address": ""}
-Return ONLY the JSON, no other text.`,
-            },
-          ],
-        }],
-      }),
+      body: JSON.stringify({ image: imageDataUrl }),
     });
-
     const data = await response.json();
-    const text = data.content?.map(c => c.text || "").join("") || "";
-    const cleaned = text.replace(/```json|```/g, "").trim();
-    return JSON.parse(cleaned);
+    if (data.success) return data.data;
+    console.error("OCR failed:", data.error);
+    return null;
   } catch (err) {
     console.error("OCR failed:", err);
     return null;
   }
 };
+
 
 // Format extracted card data into readable text
 const formatCardInfo = (card) => {
@@ -1500,6 +1481,23 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
               onMouseLeave={e => { if (!item.pinned) { e.target.style.color = theme.textGhost; e.target.style.background = "none"; } }}
               title={item.pinned ? "Unpin" : "Pin to top"}
             >{item.pinned ? "Pinned" : "Pin"}</button>
+            {item.image && !item.ocrData && (
+              <button
+                onClick={() => onScanCard(item.id)}
+                disabled={isScanning}
+                style={{
+                  background: "none", border: "none",
+                  color: isScanning ? theme.textMuted : theme.textGhost,
+                  cursor: isScanning ? "wait" : "pointer",
+                  fontSize: "11px", padding: "4px 8px",
+                  borderRadius: "6px", transition: "all 0.25s ease",
+                  fontFamily: "'DM Sans', sans-serif", fontWeight: 500,
+                  animation: isScanning ? "gentlePulse 1.5s ease infinite" : "none",
+                }}
+                onMouseEnter={e => { if (!isScanning) { e.target.style.color = theme.textMuted; e.target.style.background = theme.hoverBg; } }}
+                onMouseLeave={e => { if (!isScanning) { e.target.style.color = theme.textGhost; e.target.style.background = "none"; } }}
+              >{isScanning ? "Scanning…" : "Scan"}</button>
+            )}
                        )}
             <button
               onClick={() => onDelete(item.id)}
