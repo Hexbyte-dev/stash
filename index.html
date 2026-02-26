@@ -178,6 +178,7 @@ const builtInKeywords = {
   food:    { pattern: /restaurant|eat|food|dinner|lunch|cafe|recipe|cook|brunch|bakery|reservation/i },
   idea:    { pattern: /idea|thought|maybe|what if|brainstorm|concept|possibility/i },
   person:  { pattern: /meet|person|name|card|introduce/i },
+  recommended: { pattern: /recommend|suggested|check out|you should try|told me about|referred/i },
 };
 
 const detectType = (text, customCategories = []) => {
@@ -260,6 +261,7 @@ const themes = {
       health:  { color: "#B57EA0", bg: "#F5EBF2" },
       media:   { color: "#BF8A5E", bg: "#F8F0EB" },
       event:   { color: "#B5A05E", bg: "#F5F2E8" },
+      recommended: { color: "#D4A05E", bg: "#FBF3E8" },
     },
   },
   dark: {
@@ -311,6 +313,7 @@ const themes = {
       health:  { color: "#C898B5", bg: "#2E1E28" },
       media:   { color: "#D4A07A", bg: "#2E2518" },
       event:   { color: "#C8B87A", bg: "#2E2A1A" },
+      recommended: { color: "#D4B07A", bg: "#2E2518" },
     },
   },
 };
@@ -330,6 +333,7 @@ const typeLabels = {
   health:  { icon: "♡", label: "Health" },
   media:   { icon: "♪", label: "Media" },
   event:   { icon: "☆", label: "Event" },
+  recommended: { icon: "★", label: "Recommended" },
 };
 
 // ============================================================
