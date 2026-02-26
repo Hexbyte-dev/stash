@@ -1264,11 +1264,26 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
                 maxWidth: "280px", border: `1px solid ${theme.border}`,
                 transition: "all 0.3s ease",
                 opacity: isCompleted ? 0.7 : 1,
+                position: "relative",
               }}
             >
               <img src={item.image} alt={item.content || "Stashed image"}
                 style={{ width: "100%", display: "block", maxHeight: "200px", objectFit: "cover" }}
               />
+              {isScanning && (
+                <div style={{
+                  position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+                  background: "rgba(0, 0, 0, 0.45)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  borderRadius: "12px",
+                }}>
+                  <span style={{
+                    color: "#FFFFFF", fontSize: "13px",
+                    fontFamily: "'DM Sans', sans-serif", fontWeight: 500,
+                    animation: "gentlePulse 1.5s ease infinite",
+                  }}>Scanning...</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -1693,7 +1708,7 @@ function Stash() {
     const tagMatches = (text || "").match(/#(\w+)/g);
     if (tagMatches) tagMatches.forEach(t => tags.push(t.slice(1).toLowerCase()));
     const cleanContent = text ? text.replace(/#\w+/g, "").trim() : "";
-    
+
     // Determine type: manual override > photo > auto-detect
     let itemType;
     if (pendingImage && selectedType === "auto") {
@@ -1703,13 +1718,20 @@ function Stash() {
     } else {
       itemType = detectType(cleanContent || text, settings.customCategories);
     }
-    
+
+    // Generate a unique ID up front so we can reference this item
+    // later when the OCR results come back asynchronously
+    const newId = generateId();
+
+    // Capture the image data before we clear pendingImage below
+    const imageData = pendingImage ? pendingImage.data : null;
+
     setItems(prev => [{
-      id: generateId(),
+      id: newId,
       content: cleanContent || (pendingImage ? pendingImage.fileName : text),
       type: itemType,
       tags: pendingImage && tags.length === 0 ? ["photo"] : tags,
-      image: pendingImage ? pendingImage.data : null,
+      image: imageData,
       createdAt: new Date().toISOString(),
       completed: false,
       completedAt: null,
@@ -1719,6 +1741,35 @@ function Stash() {
     setPendingImage(null);
     setSelectedType("auto"); // Reset to auto after stashing
     inputRef.current?.focus();
+
+    // AUTO-SCAN: If this item has an image, automatically run OCR
+    // in the background. The card appears immediately with the photo,
+    // and we update it in place when results come back.
+    if (imageData) {
+      setScanningId(newId);
+      extractBusinessCard(imageData).then((cardData) => {
+        setScanningId(null);
+        if (cardData) {
+          // OCR found contact info — update the item
+          const formatted = formatCardInfo(cardData);
+          const updatedTags = [...tags];
+          if (!updatedTags.includes("business-card")) updatedTags.push("business-card");
+          if (cardData.company && !updatedTags.includes(cardData.company.toLowerCase())) {
+            updatedTags.push(cardData.company.toLowerCase().replace(/\s+/g, "-"));
+          }
+          // setItems uses a callback so we always work with the
+          // latest state — this avoids overwriting any edits the
+          // user made while OCR was running
+          setItems(prev => prev.map(item =>
+            item.id === newId
+              ? { ...item, content: formatted, type: "contact", tags: updatedTags, ocrData: cardData }
+              : item
+          ));
+        }
+        // If cardData is null, the image wasn't a business card —
+        // we just leave the item as a regular photo. No harm done.
+      });
+    }
   };
 
   const deleteItem = (id) => {
