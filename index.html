@@ -2199,6 +2199,13 @@ function Stash() {
   const restoreItem = () => {
     if (undoItem) {
       setItems(prev => [...undoItem.items, ...prev]);
+      // Re-create on server (items were already deleted by the sync call)
+      undoItem.items.forEach(item => {
+        apiFetch("/api/stashes", {
+          method: "POST",
+          body: JSON.stringify(item),
+        }).catch(err => console.error("[Sync] Restore failed:", err.message));
+      });
       setUndoItem(null);
       if (undoTimer) clearTimeout(undoTimer);
     }
@@ -2237,23 +2244,19 @@ function Stash() {
   };
 
   const toggleComplete = (id) => {
-    setItems(prev => prev.map(item => {
-      if (item.id !== id) return item;
-      const updated = {
-        ...item,
-        completed: !item.completed,
-        completedAt: !item.completed ? new Date().toISOString() : null,
-      };
-      // Sync to server
-      apiFetch(`/api/stashes/${id}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          completed: updated.completed,
-          completedAt: updated.completedAt,
-        }),
-      }).catch(err => console.error("[Sync] Update failed:", err.message));
-      return updated;
-    }));
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+    const completed = !item.completed;
+    const completedAt = completed ? new Date().toISOString() : null;
+
+    setItems(prev => prev.map(i =>
+      i.id === id ? { ...i, completed, completedAt } : i
+    ));
+    // Sync to server
+    apiFetch(`/api/stashes/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ completed, completedAt }),
+    }).catch(err => console.error("[Sync] Update failed:", err.message));
   };
 
   // Edit an item's content, tags, and re-detect its type
@@ -2299,16 +2302,18 @@ function Stash() {
 
   // Toggle pin status
   const togglePin = (id) => {
-    setItems(prev => prev.map(item => {
-      if (item.id !== id) return item;
-      const updated = { ...item, pinned: !item.pinned };
-      // Sync to server
-      apiFetch(`/api/stashes/${id}`, {
-        method: "PUT",
-        body: JSON.stringify({ pinned: updated.pinned }),
-      }).catch(err => console.error("[Sync] Update failed:", err.message));
-      return updated;
-    }));
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+    const pinned = !item.pinned;
+
+    setItems(prev => prev.map(i =>
+      i.id === id ? { ...i, pinned } : i
+    ));
+    // Sync to server
+    apiFetch(`/api/stashes/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ pinned }),
+    }).catch(err => console.error("[Sync] Update failed:", err.message));
   };
 
   const handleKeyDown = (e) => {
