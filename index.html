@@ -1646,7 +1646,12 @@ const LoginScreen = ({ onLogin, theme }) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error("Server returned an unexpected response. Try again in a moment.");
+      }
 
       if (!response.ok) {
         throw new Error(data.error || "Something went wrong");
@@ -1656,7 +1661,11 @@ const LoginScreen = ({ onLogin, theme }) => {
       localStorage.setItem("stash-token", data.token);
       onLogin(data.token, data.user);
     } catch (err) {
-      setError(err.message);
+      if (err instanceof TypeError) {
+        setError("Unable to reach the server. Check your connection and try again.");
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
