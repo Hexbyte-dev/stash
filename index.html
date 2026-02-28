@@ -1866,6 +1866,7 @@ function Stash() {
   // Listen for auth-expired events from apiFetch
   useEffect(() => {
     const handleAuthExpired = () => {
+      localStorage.removeItem("stash-token");
       setToken(null);
       setUser(null);
       setItems([]);
@@ -1886,17 +1887,25 @@ function Stash() {
       // Check for localStorage stashes to migrate
       const localData = localStorage.getItem("stash-items");
       if (localData) {
-        const localStashes = JSON.parse(localData);
-        if (localStashes.length > 0) {
-          await fetch(`${BACKEND_URL}/api/stashes/import`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${newToken}`,
-            },
-            body: JSON.stringify({ stashes: localStashes }),
-          });
+        let localStashes;
+        try {
+          localStashes = JSON.parse(localData);
+        } catch (parseErr) {
+          console.error("[Auth] Corrupt local data, skipping migration:", parseErr);
           localStorage.removeItem("stash-items");
+          localStashes = [];
+        }
+        if (localStashes.length > 0) {
+          try {
+            await apiFetch("/api/stashes/import", {
+              method: "POST",
+              body: JSON.stringify({ stashes: localStashes }),
+            });
+            // Only clear localStorage after successful migration
+            localStorage.removeItem("stash-items");
+          } catch (importErr) {
+            console.error("[Auth] Migration import failed, keeping local data:", importErr.message);
+          }
         }
       }
 
@@ -1905,6 +1914,7 @@ function Stash() {
       setItems(data.stashes);
     } catch (err) {
       console.error("[Auth] Failed to load stashes:", err.message);
+      setAuthError("Logged in, but couldn't load your stashes. Please refresh to try again.");
     } finally {
       setAuthLoading(false);
       setIsLoading(false);
