@@ -1857,6 +1857,67 @@ const LoginScreen = ({ onLogin, theme }) => {
 // MAIN APP
 // ============================================================
 function Stash() {
+  // --- Auth state ---
+  const [token, setToken] = useState(localStorage.getItem("stash-token"));
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(!!localStorage.getItem("stash-token"));
+  const [authError, setAuthError] = useState("");
+
+  // Listen for auth-expired events from apiFetch
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      setToken(null);
+      setUser(null);
+      setItems([]);
+      setAuthError("Session expired. Please log in again.");
+    };
+    window.addEventListener("auth-expired", handleAuthExpired);
+    return () => window.removeEventListener("auth-expired", handleAuthExpired);
+  }, []);
+
+  // Called by LoginScreen after successful login/signup
+  const handleLogin = async (newToken, userData) => {
+    setToken(newToken);
+    setUser(userData);
+    setAuthError("");
+    setAuthLoading(true);
+
+    try {
+      // Check for localStorage stashes to migrate
+      const localData = localStorage.getItem("stash-items");
+      if (localData) {
+        const localStashes = JSON.parse(localData);
+        if (localStashes.length > 0) {
+          await fetch(`${BACKEND_URL}/api/stashes/import`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${newToken}`,
+            },
+            body: JSON.stringify({ stashes: localStashes }),
+          });
+          localStorage.removeItem("stash-items");
+        }
+      }
+
+      // Fetch all stashes from the server
+      const data = await apiFetch("/api/stashes");
+      setItems(data.stashes);
+    } catch (err) {
+      console.error("[Auth] Failed to load stashes:", err.message);
+    } finally {
+      setAuthLoading(false);
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("stash-token");
+    setToken(null);
+    setUser(null);
+    setItems([]);
+  };
+
   const [items, setItems] = useState([]);
   const [inputValue, setInputValue] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -1888,67 +1949,39 @@ function Stash() {
   // Current theme based on settings
   const theme = settings.darkMode ? themes.dark : themes.light;
 
-  // Load items + settings
+  // Load data on mount
   useEffect(() => {
     const loadData = async () => {
-      let loadedItems = [];
-      try {
-        const itemsResult = await window.storage.get("stash-items");
-        if (itemsResult?.value) {
-          loadedItems = JSON.parse(itemsResult.value);
-          setItems(loadedItems);
-        }
-      } catch (e) {}
+      // Load settings from localStorage (stays local, not synced)
       try {
         const settingsResult = await window.storage.get("stash-settings");
         if (settingsResult?.value) setSettings(prev => ({ ...prev, ...JSON.parse(settingsResult.value) }));
       } catch (e) {}
 
-      // Onboarding: seed example items for first-time users
-      if (loadedItems.length === 0) {
-        const now = Date.now();
-        const exampleItems = [
-          {
-            id: "example-1", type: "note", tags: ["welcome"],
-            content: "👋 Welcome to Stash! This is an example note. Try editing me by clicking my text, or swipe me away with the × button.",
-            createdAt: new Date(now).toISOString(),
-            completed: false, pinned: true,
-          },
-          {
-            id: "example-2", type: "link", tags: ["reading"],
-            content: "https://example.com — save links, articles, and bookmarks here",
-            createdAt: new Date(now - 60000).toISOString(),
-            completed: false, pinned: false,
-          },
-          {
-            id: "example-3", type: "idea", tags: ["cooking", "try-this"],
-            content: "Try that new Thai place on 5th street #cooking #try-this",
-            createdAt: new Date(now - 120000).toISOString(),
-            completed: false, pinned: false,
-          },
-          {
-            id: "example-4", type: "photo", tags: [],
-            content: "Drop a photo here — business cards, receipts, whiteboard notes. You can even scan business cards with OCR!",
-            createdAt: new Date(now - 180000).toISOString(),
-            completed: false, pinned: false,
-          },
-        ];
-        setItems(exampleItems);
+      // If we have a token, try loading stashes from the server
+      if (token) {
+        try {
+          const data = await apiFetch("/api/stashes");
+          setItems(data.stashes);
+          setAuthLoading(false);
+          setIsLoading(false);
+        } catch (err) {
+          // Token is invalid or expired — clear it
+          localStorage.removeItem("stash-token");
+          setToken(null);
+          setAuthLoading(false);
+          setIsLoading(false);
+        }
+      } else {
+        // No token — just finish loading (will show login screen)
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
     loadData();
   }, []);
 
-  // Save items
-  useEffect(() => {
-    if (!isLoading) {
-      (async () => {
-        try { await window.storage.set("stash-items", JSON.stringify(items)); }
-        catch (e) { console.error("Save failed:", e); }
-      })();
-    }
-  }, [items, isLoading]);
+  // Items are now saved via API calls (addItem, editItem, deleteItem, etc.)
+  // No localStorage save needed for items.
 
   // Save settings
   useEffect(() => {
