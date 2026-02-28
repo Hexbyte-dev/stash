@@ -463,17 +463,13 @@ const apiFetch = async (path, options = {}) => {
 
 const extractBusinessCard = async (imageDataUrl) => {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/ocr`, {
+    const data = await apiFetch("/api/ocr", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ image: imageDataUrl }),
     });
-    const data = await response.json();
-    if (data.success) return data.data;
-    console.error("OCR failed:", data.error);
-    return null;
+    return data.data || null;
   } catch (err) {
-    console.error("OCR failed:", err);
+    console.error("[OCR Error]", err.message);
     return null;
   }
 };
