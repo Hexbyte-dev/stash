@@ -414,6 +414,48 @@ const compressImage = (dataUrl, maxWidth = 800) =>
 // ============================================================
 const BACKEND_URL = "https://stash-server-production-1c71.up.railway.app";
 
+// ============================================================
+// API HELPER
+//
+// Wraps fetch() to attach the JWT token and handle errors.
+// Every authenticated API call uses this function.
+//
+// NEW CONCEPT: "Bearer token"
+// When a user logs in, the server gives them a token (a long
+// string). For every API request after that, we send this token
+// in the "Authorization" header so the server knows who we are.
+// The format is: "Bearer <token>" — "Bearer" is just a keyword
+// that tells the server "here comes a token."
+// ============================================================
+const apiFetch = async (path, options = {}) => {
+  const token = localStorage.getItem("stash-token");
+  const headers = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...options.headers,
+  };
+
+  const response = await fetch(`${BACKEND_URL}${path}`, {
+    ...options,
+    headers,
+  });
+
+  // If the server says our token is expired or invalid,
+  // we need to log out and show the login screen again
+  if (response.status === 401) {
+    localStorage.removeItem("stash-token");
+    // Dispatch a custom event so the Stash component can react
+    window.dispatchEvent(new CustomEvent("auth-expired"));
+    throw new Error("Session expired");
+  }
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || "Request failed");
+  }
+  return data;
+};
+
 const extractBusinessCard = async (imageDataUrl) => {
   try {
     const response = await fetch(`${BACKEND_URL}/api/ocr`, {
