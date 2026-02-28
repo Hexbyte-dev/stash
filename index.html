@@ -695,7 +695,7 @@ const CustomCategoryForm = ({ onAdd, theme }) => {
   );
 };
 
-const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, itemCount, completedCount, onExport, onExportFull, onImport }) => {
+const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, itemCount, completedCount, onExport, onExportFull, onImport, onLogout }) => {
   if (!isOpen) return null;
 
   return (
@@ -1082,6 +1082,29 @@ const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, ite
             />
           </label>
         </div>
+        {/* Logout */}
+        {onLogout && (
+          <div style={{ marginTop: "28px", paddingTop: "20px", borderTop: `1px solid ${theme.border}` }}>
+            <button
+              onClick={onLogout}
+              style={{
+                width: "100%",
+                padding: "12px",
+                borderRadius: "12px",
+                border: `1px solid ${theme.border}`,
+                background: "none",
+                color: theme.deleteColor,
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: "14px",
+                fontWeight: 500,
+                cursor: "pointer",
+                transition: "background 0.2s ease",
+              }}
+              onMouseEnter={(e) => e.target.style.background = theme.deleteBg}
+              onMouseLeave={(e) => e.target.style.background = "none"}
+            >Log out</button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1627,11 +1650,11 @@ const EmptyState = ({ theme }) => (
 //   "login" and "signup" mode. The form fields are the same,
 //   just the button text and API endpoint change.
 // ============================================================
-const LoginScreen = ({ onLogin, theme }) => {
+const LoginScreen = ({ onLogin, theme, initialError }) => {
   const [authMode, setAuthMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(initialError || "");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -2399,7 +2422,8 @@ function Stash() {
 
   const hasContent = inputValue.trim() || pendingImage;
 
-  if (isLoading) {
+  // Show loading screen while checking auth
+  if (isLoading || authLoading) {
     return (
       <div style={{
         minHeight: "100vh", background: theme.pageBg,
@@ -2407,8 +2431,16 @@ function Stash() {
         color: theme.textFaint, fontFamily: "'Lora', serif",
         fontStyle: "italic", fontSize: "15px",
         transition: "background 0.4s ease",
-      }}>opening your stash…</div>
+      }}>
+        <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap" rel="stylesheet" />
+        opening your stash…
+      </div>
     );
+  }
+
+  // Show login screen if not authenticated
+  if (!token) {
+    return <LoginScreen onLogin={handleLogin} theme={theme} initialError={authError} />;
   }
 
   return (
@@ -2520,6 +2552,7 @@ function Stash() {
             alert("This doesn't look like a valid Stash backup file.");
           }
         }}
+        onLogout={handleLogout}
       />
 
       {/* ===== MAIN CONTENT ===== */}
