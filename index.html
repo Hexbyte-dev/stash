@@ -1607,6 +1607,244 @@ const EmptyState = ({ theme }) => (
 );
 
 // ============================================================
+// LOGIN SCREEN
+//
+// Full-page login/signup form. Rendered when the user has no
+// valid JWT token. Uses the same theme system as the rest of
+// the app.
+//
+// NEW CONCEPTS:
+// - "Controlled form" — React controls the input values via
+//   state (email, password). Every keystroke updates state,
+//   and the input always shows the current state value.
+//
+// - "Form submission" — We prevent the browser's default form
+//   submit (which would reload the page) and handle it ourselves
+//   with an API call.
+//
+// - "authMode" toggle — Instead of two separate pages, we use
+//   one component with a state variable that switches between
+//   "login" and "signup" mode. The form fields are the same,
+//   just the button text and API endpoint change.
+// ============================================================
+const LoginScreen = ({ onLogin, theme }) => {
+  const [authMode, setAuthMode] = useState("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const endpoint = authMode === "login" ? "/api/auth/login" : "/api/auth/signup";
+      const response = await fetch(`${BACKEND_URL}${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Something went wrong");
+      }
+
+      // Save the token and tell the parent component
+      localStorage.setItem("stash-token", data.token);
+      onLogin(data.token, data.user);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: theme.pageBg,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontFamily: "'DM Sans', sans-serif",
+      transition: "background 0.4s ease",
+    }}>
+      <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap" rel="stylesheet" />
+
+      <div style={{
+        width: "92%",
+        maxWidth: "380px",
+        animation: "softFadeIn 0.6s ease",
+      }}>
+        {/* Branding */}
+        <div style={{ textAlign: "center", marginBottom: "36px" }}>
+          <h1 style={{
+            fontFamily: "'Lora', serif",
+            fontSize: "36px",
+            fontWeight: 400,
+            color: theme.textSecondary,
+            letterSpacing: "-0.02em",
+            margin: "0 0 6px",
+          }}>Stash</h1>
+          <p style={{
+            fontFamily: "'Lora', serif",
+            fontSize: "14px",
+            color: theme.textGhost,
+            fontStyle: "italic",
+            margin: 0,
+          }}>your personal memory bank</p>
+        </div>
+
+        {/* Form card */}
+        <div style={{
+          background: theme.cardBg,
+          borderRadius: "20px",
+          border: `1px solid ${theme.border}`,
+          padding: "32px 28px",
+          boxShadow: theme.shadowMedium,
+        }}>
+          <form onSubmit={handleSubmit}>
+            {/* Email */}
+            <div style={{ marginBottom: "18px" }}>
+              <label style={{
+                display: "block",
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: "13px",
+                fontWeight: 500,
+                color: theme.textMuted,
+                marginBottom: "6px",
+              }}>Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                placeholder="you@example.com"
+                required
+                autoComplete="email"
+                style={{
+                  width: "100%",
+                  padding: "12px 14px",
+                  borderRadius: "12px",
+                  border: `1px solid ${theme.border}`,
+                  background: theme.inputBg,
+                  color: theme.textPrimary,
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: "15px",
+                  outline: "none",
+                  boxSizing: "border-box",
+                  transition: "border-color 0.2s ease",
+                }}
+                onFocus={(e) => e.target.style.borderColor = theme.borderHover}
+                onBlur={(e) => e.target.style.borderColor = theme.border}
+              />
+            </div>
+
+            {/* Password */}
+            <div style={{ marginBottom: "24px" }}>
+              <label style={{
+                display: "block",
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: "13px",
+                fontWeight: 500,
+                color: theme.textMuted,
+                marginBottom: "6px",
+              }}>Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                placeholder={authMode === "signup" ? "8+ characters" : ""}
+                required
+                autoComplete={authMode === "login" ? "current-password" : "new-password"}
+                style={{
+                  width: "100%",
+                  padding: "12px 14px",
+                  borderRadius: "12px",
+                  border: `1px solid ${theme.border}`,
+                  background: theme.inputBg,
+                  color: theme.textPrimary,
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: "15px",
+                  outline: "none",
+                  boxSizing: "border-box",
+                  transition: "border-color 0.2s ease",
+                }}
+                onFocus={(e) => e.target.style.borderColor = theme.borderHover}
+                onBlur={(e) => e.target.style.borderColor = theme.border}
+              />
+            </div>
+
+            {/* Error message */}
+            {error && (
+              <div style={{
+                color: theme.deleteColor,
+                fontSize: "13px",
+                fontFamily: "'DM Sans', sans-serif",
+                marginBottom: "16px",
+                textAlign: "center",
+              }}>{error}</div>
+            )}
+
+            {/* Submit button */}
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                width: "100%",
+                padding: "13px",
+                borderRadius: "12px",
+                border: "none",
+                background: loading ? theme.disabledBg : theme.accentGradient,
+                color: loading ? theme.disabledText : "#FFFFFF",
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: "15px",
+                fontWeight: 500,
+                cursor: loading ? "default" : "pointer",
+                transition: "opacity 0.2s ease",
+              }}
+            >
+              {loading
+                ? (authMode === "login" ? "Logging in..." : "Creating account...")
+                : (authMode === "login" ? "Log in" : "Create account")}
+            </button>
+          </form>
+
+          {/* Toggle login/signup */}
+          <div style={{
+            textAlign: "center",
+            marginTop: "20px",
+            fontSize: "13px",
+            color: theme.textFaint,
+            fontFamily: "'DM Sans', sans-serif",
+          }}>
+            {authMode === "login" ? (
+              <span>
+                Don't have an account?{" "}
+                <span
+                  onClick={() => { setAuthMode("signup"); setError(""); }}
+                  style={{ color: theme.accent, cursor: "pointer", fontWeight: 500 }}
+                >Sign up</span>
+              </span>
+            ) : (
+              <span>
+                Already have an account?{" "}
+                <span
+                  onClick={() => { setAuthMode("login"); setError(""); }}
+                  style={{ color: theme.accent, cursor: "pointer", fontWeight: 500 }}
+                >Log in</span>
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
 // MAIN APP
 // ============================================================
 function Stash() {
