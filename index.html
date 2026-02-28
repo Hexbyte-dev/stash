@@ -2078,6 +2078,18 @@ function Stash() {
       completedAt: null,
       pinned: false,
     }, ...prev]);
+    // Sync to server
+    apiFetch("/api/stashes", {
+      method: "POST",
+      body: JSON.stringify({
+        id: newId,
+        type: itemType,
+        content: cleanContent || (pendingImage ? pendingImage.fileName : text),
+        tags: pendingImage && tags.length === 0 ? ["photo"] : tags,
+        image: imageData,
+        createdAt: new Date().toISOString(),
+      }),
+    }).catch(err => console.error("[Sync] Create failed:", err.message));
     setInputValue("");
     setPendingImage(null);
     setSelectedType("auto"); // Reset to auto after stashing
@@ -2106,6 +2118,16 @@ function Stash() {
               ? { ...item, content: formatted, type: "contact", tags: updatedTags, ocrData: cardData }
               : item
           ));
+          // Sync OCR results to server
+          apiFetch(`/api/stashes/${newId}`, {
+            method: "PUT",
+            body: JSON.stringify({
+              content: formatted,
+              type: "contact",
+              tags: updatedTags,
+              ocrData: cardData,
+            }),
+          }).catch(err => console.error("[Sync] OCR update failed:", err.message));
         }
         // If cardData is null, the image wasn't a business card —
         // we just leave the item as a regular photo. No harm done.
@@ -2120,7 +2142,10 @@ function Stash() {
     setTimeout(() => {
       setSlidingOut(prev => { const next = new Set(prev); next.delete(id); return next; });
       setItems(prev => prev.filter(i => i.id !== id));
-      
+      // Sync to server
+      apiFetch(`/api/stashes/${id}`, { method: "DELETE" })
+        .catch(err => console.error("[Sync] Delete failed:", err.message));
+
       // Set up undo
       if (item) {
         setUndoItem({ items: [item], label: "Deleted" });
@@ -2138,9 +2163,14 @@ function Stash() {
     setTimeout(() => {
       setSlidingOut(new Set());
       setItems(prev => prev.filter(i => !ids.has(i.id)));
+      // Sync to server
+      ids.forEach(id => {
+        apiFetch(`/api/stashes/${id}`, { method: "DELETE" })
+          .catch(err => console.error("[Sync] Delete failed:", err.message));
+      });
       setBulkSelected(new Set());
       setBulkMode(false);
-      
+
       if (deletedItems.length > 0) {
         setUndoItem({ items: deletedItems, label: `Deleted ${deletedItems.length} items` });
         if (undoTimer) clearTimeout(undoTimer);
@@ -2151,9 +2181,17 @@ function Stash() {
   };
 
   const completeMultiple = (ids) => {
+    const completedAt = new Date().toISOString();
     setItems(prev => prev.map(item =>
-      ids.has(item.id) ? { ...item, completed: true, completedAt: new Date().toISOString() } : item
+      ids.has(item.id) ? { ...item, completed: true, completedAt } : item
     ));
+    // Sync to server
+    ids.forEach(id => {
+      apiFetch(`/api/stashes/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ completed: true, completedAt }),
+      }).catch(err => console.error("[Sync] Update failed:", err.message));
+    });
     setBulkSelected(new Set());
     setBulkMode(false);
   };
@@ -2182,8 +2220,13 @@ function Stash() {
     setTimeout(() => {
       setSlidingOut(new Set());
       setItems(prev => prev.filter(i => !i.completed));
+      // Sync to server
+      completedIds.forEach(id => {
+        apiFetch(`/api/stashes/${id}`, { method: "DELETE" })
+          .catch(err => console.error("[Sync] Delete failed:", err.message));
+      });
       setConfirmClearAll(false);
-      
+
       if (deletedItems.length > 0) {
         setUndoItem({ items: deletedItems, label: `Cleared ${deletedItems.length} completed` });
         if (undoTimer) clearTimeout(undoTimer);
@@ -2194,11 +2237,23 @@ function Stash() {
   };
 
   const toggleComplete = (id) => {
-    setItems(prev => prev.map(item =>
-      item.id === id
-        ? { ...item, completed: !item.completed, completedAt: !item.completed ? new Date().toISOString() : null }
-        : item
-    ));
+    setItems(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const updated = {
+        ...item,
+        completed: !item.completed,
+        completedAt: !item.completed ? new Date().toISOString() : null,
+      };
+      // Sync to server
+      apiFetch(`/api/stashes/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          completed: updated.completed,
+          completedAt: updated.completedAt,
+        }),
+      }).catch(err => console.error("[Sync] Update failed:", err.message));
+      return updated;
+    }));
   };
 
   // Edit an item's content, tags, and re-detect its type
@@ -2208,6 +2263,11 @@ function Stash() {
         ? { ...item, ...updates }
         : item
     ));
+    // Sync to server
+    apiFetch(`/api/stashes/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(updates),
+    }).catch(err => console.error("[Sync] Update failed:", err.message));
   };
 
   // Scan business card with OCR
@@ -2239,11 +2299,16 @@ function Stash() {
 
   // Toggle pin status
   const togglePin = (id) => {
-    setItems(prev => prev.map(item =>
-      item.id === id
-        ? { ...item, pinned: !item.pinned }
-        : item
-    ));
+    setItems(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const updated = { ...item, pinned: !item.pinned };
+      // Sync to server
+      apiFetch(`/api/stashes/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ pinned: updated.pinned }),
+      }).catch(err => console.error("[Sync] Update failed:", err.message));
+      return updated;
+    }));
   };
 
   const handleKeyDown = (e) => {
