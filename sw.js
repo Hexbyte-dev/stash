@@ -66,8 +66,9 @@ self.addEventListener("fetch", (event) => {
   // Only handle GET requests
   if (request.method !== "GET") return;
 
-  // Skip API calls (like the Anthropic OCR endpoint)
+  // Skip API calls — these should always hit the network
   if (request.url.includes("api.anthropic.com")) return;
+  if (request.url.includes("stash-server-production")) return;
 
   event.respondWith(
     caches.match(request).then((cachedResponse) => {

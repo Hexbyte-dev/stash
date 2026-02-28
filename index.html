@@ -2024,13 +2024,21 @@ function Stash() {
 
   // Auto-archive: remove completed items older than threshold
   useEffect(() => {
-    if (settings.autoArchiveDays > 0 && !isLoading) {
+    if (settings.autoArchiveDays > 0 && !isLoading && token) {
       const now = Date.now();
       const threshold = settings.autoArchiveDays * 24 * 60 * 60 * 1000;
-      setItems(prev => prev.filter(item => {
-        if (!item.completed || !item.completedAt) return true;
-        return (now - new Date(item.completedAt).getTime()) < threshold;
-      }));
+      const toArchive = items.filter(item =>
+        item.completed && item.completedAt &&
+        (now - new Date(item.completedAt).getTime()) >= threshold
+      );
+      if (toArchive.length > 0) {
+        setItems(prev => prev.filter(i => !toArchive.some(a => a.id === i.id)));
+        // Sync to server
+        toArchive.forEach(item => {
+          apiFetch(`/api/stashes/${item.id}`, { method: "DELETE" })
+            .catch(err => console.error("[Sync] Archive delete failed:", err.message));
+        });
+      }
     }
   }, [settings.autoArchiveDays, isLoading]);
 
@@ -2540,10 +2548,19 @@ function Stash() {
         onExportFull={() => exportDataFull(items, settings)}
         onImport={(data) => {
           if (data?.items && Array.isArray(data.items)) {
-            // Merge or replace — we'll replace for simplicity
             setItems(data.items);
             if (data.settings) setSettings(prev => ({ ...prev, ...data.settings }));
             setSettingsOpen(false);
+            // Sync imported items to server
+            apiFetch("/api/stashes/import", {
+              method: "POST",
+              body: JSON.stringify({ stashes: data.items }),
+            }).then(() => {
+              // Re-fetch from server to get canonical state
+              return apiFetch("/api/stashes");
+            }).then(serverData => {
+              setItems(serverData.stashes);
+            }).catch(err => console.error("[Sync] Import failed:", err.message));
           } else {
             alert("This doesn't look like a valid Stash backup file.");
           }
