@@ -29,7 +29,10 @@
   <script crossorigin="anonymous" src="https://unpkg.com/@babel/standalone@7.26.9/babel.min.js"></script>
 
   <!-- CSP: restrict where scripts, styles, fonts, images, and API calls can come from (defense-in-depth) -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://stash-server-production-1c71.up.railway.app;">
+  <!-- CSP: 'unsafe-eval' needed because Babel transpiles JSX at runtime using eval.
+       'unsafe-inline' needed because Babel injects the transpiled code as inline <script> elements.
+       Long-term fix: add a build step to eliminate both. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' http://localhost:3001 https://stash-server-production-1c71.up.railway.app;">
 
   <!-- Google Fonts — loaded once here instead of repeated in JSX (Fix #7) -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" crossorigin="anonymous">
