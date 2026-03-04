@@ -1,6 +1,6 @@
 // ============================================================
 // STASH SERVICE WORKER
-// 
+//
 // This file runs in the background, separate from your app.
 // It intercepts network requests and serves cached responses
 // when offline. Think of it as a helpful proxy between your
@@ -15,19 +15,41 @@
 const CACHE_NAME = "stash-v1";
 
 // Core files to cache immediately on install
+// Fix #1: Pinned to exact versions to match index.html (prevents version drift)
 const CORE_ASSETS = [
   "/",
   "/index.html",
   "/manifest.json",
   "/icon-192.png",
   "/icon-512.png",
-  // React from CDN — cached locally for offline
-  "https://unpkg.com/react@18/umd/react.production.min.js",
-  "https://unpkg.com/react-dom@18/umd/react-dom.production.min.js",
-  "https://unpkg.com/@babel/standalone/babel.min.js",
+  // React from CDN — pinned versions, cached locally for offline
+  "https://unpkg.com/react@18.3.1/umd/react.production.min.js",
+  "https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js",
+  "https://unpkg.com/@babel/standalone@7.26.9/babel.min.js",
   // Fonts
   "https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap",
+  "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
 ];
+
+// Fix #18: Only cache responses from these trusted origins.
+// Without this, ANY response from ANY website could end up in the cache
+// (e.g. tracking pixels, third-party scripts from ads, etc.)
+const CACHEABLE_ORIGINS = [
+  self.location.origin,           // our own app (e.g. localhost or Netlify)
+  'https://unpkg.com',            // React + Babel CDN
+  'https://fonts.googleapis.com', // Font CSS files
+  'https://fonts.gstatic.com',    // Actual font files
+];
+
+// Helper: check if a URL is from a cacheable origin
+const isCacheable = (url) => {
+  try {
+    const parsed = new URL(url);
+    return CACHEABLE_ORIGINS.some(origin => parsed.origin === origin || parsed.href.startsWith(origin));
+  } catch {
+    return false;
+  }
+};
 
 // INSTALL: Cache core assets
 self.addEventListener("install", (event) => {
@@ -70,6 +92,9 @@ self.addEventListener("fetch", (event) => {
   if (request.url.includes("api.anthropic.com")) return;
   if (request.url.includes("stash-server-production")) return;
 
+  // Fix #18: Skip non-cacheable origins entirely
+  if (!isCacheable(request.url)) return;
+
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       if (cachedResponse) {
@@ -90,7 +115,7 @@ self.addEventListener("fetch", (event) => {
       // Not in cache — try network
       return fetch(request)
         .then((networkResponse) => {
-          // Cache the new response for next time
+          // Cache the new response for next time (only from allowed origins)
           if (networkResponse && networkResponse.status === 200) {
             const responseToCache = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {

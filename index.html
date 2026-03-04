@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <!-- viewport-fit=cover extends into notch areas; removed user-scalable=no so users can zoom (accessibility) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#6B5F53" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -22,10 +23,17 @@
     body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
   </style>
 
-  <!-- React from CDN -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- React from CDN — pinned to exact versions for security (prevents supply-chain attacks via version drift) -->
+  <script crossorigin="anonymous" src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script crossorigin="anonymous" src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script crossorigin="anonymous" src="https://unpkg.com/@babel/standalone@7.26.9/babel.min.js"></script>
+
+  <!-- CSP: restrict where scripts, styles, fonts, images, and API calls can come from (defense-in-depth) -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://stash-server-production-1c71.up.railway.app;">
+
+  <!-- Google Fonts — loaded once here instead of repeated in JSX (Fix #7) -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap" crossorigin="anonymous">
 
   <script>
     // ============================================================
@@ -81,25 +89,31 @@
     // criteria are met. We capture it so we can show our own
     // install button instead of relying on the browser's banner.
     // ============================================================
-    let deferredPrompt = null;
+    // Fix #15: Use window.deferredPrompt consistently so InstallBanner can read it
+    window.deferredPrompt = null;
     window.addEventListener("beforeinstallprompt", (e) => {
       e.preventDefault();
-      deferredPrompt = e;
+      window.deferredPrompt = e;
       // Dispatch a custom event so our React app can show an install button
       window.dispatchEvent(new CustomEvent("pwa-installable"));
     });
 
     window.addEventListener("appinstalled", () => {
-      deferredPrompt = null;
+      window.deferredPrompt = null;
       window.dispatchEvent(new CustomEvent("pwa-installed"));
       console.log("[PWA] App installed successfully");
     });
   </script>
 </head>
 <body>
+  <!-- Fallback for users with JavaScript disabled -->
+  <noscript><p style="padding: 2rem; font-family: sans-serif;">Stash requires JavaScript to run.</p></noscript>
   <div id="root"></div>
   <script type="text/babel">
     const { useState, useEffect, useRef, useCallback } = React;
+
+// Fix #17: Single version constant — change this one value to update everywhere
+const APP_VERSION = "0.8";
 
 /*
   STASH — Your Personal Memory Bank
@@ -181,16 +195,22 @@ const builtInKeywords = {
   recommended: { pattern: /recommend|suggested|check out|you should try|told me about|referred/i },
 };
 
+// Fix #3: Escape special regex characters in user input.
+// Without this, a keyword like "c++" would break the RegExp because
+// "+" has special meaning in regex. This makes it literal.
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const detectType = (text, customCategories = []) => {
   // Check built-in patterns (link and contact first — most specific)
   for (const key of ["link", "contact"]) {
     if (builtInKeywords[key].pattern.test(text)) return key;
   }
-  
+
   // Check custom categories (user-defined keywords take priority)
   for (const cat of customCategories) {
     if (cat.keywords && cat.keywords.length > 0) {
-      const pattern = new RegExp(cat.keywords.join("|"), "i");
+      // Fix #3: Escape each keyword so special chars like "." or "+" are treated literally
+      const pattern = new RegExp(cat.keywords.map(escapeRegex).join("|"), "i");
       if (pattern.test(text)) return cat.id;
     }
   }
@@ -387,8 +407,10 @@ const readFileAsBase64 = (file) =>
     reader.readAsDataURL(file);
   });
 
+// Fix #5: Added reject + img.onerror so a broken image rejects the
+// Promise instead of hanging forever (a "dangling promise" bug)
 const compressImage = (dataUrl, maxWidth = 800) =>
-  new Promise((resolve) => {
+  new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement("canvas");
@@ -399,6 +421,8 @@ const compressImage = (dataUrl, maxWidth = 800) =>
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       resolve(canvas.toDataURL("image/jpeg", 0.7));
     };
+    // If the image data is corrupt or unreadable, reject so callers can handle it
+    img.onerror = () => reject(new Error("Failed to load image"));
     img.src = dataUrl;
   });
 
@@ -499,7 +523,7 @@ const formatCardInfo = (card) => {
 const exportData = (items, settings) => {
   const exportObj = {
     exportDate: new Date().toISOString(),
-    version: "0.8",
+    version: APP_VERSION, // Fix #17: references shared constant
     itemCount: items.length,
     items: items.map(({ image, ...rest }) => ({
       ...rest,
@@ -526,7 +550,7 @@ const exportData = (items, settings) => {
 const exportDataFull = (items, settings) => {
   const exportObj = {
     exportDate: new Date().toISOString(),
-    version: "0.8",
+    version: APP_VERSION, // Fix #17: references shared constant
     itemCount: items.length,
     items: items,
     settings: {
@@ -549,9 +573,16 @@ const exportDataFull = (items, settings) => {
 // ============================================================
 // IMAGE VIEWER
 // ============================================================
+// Fix #12 + #13: Added ARIA dialog attributes and Escape key handler for accessibility
 const ImageViewer = ({ src, onClose, theme }) => (
   <div
     onClick={onClose}
+    onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+    tabIndex={-1}
+    ref={(el) => el && el.focus()}
+    role="dialog"
+    aria-modal="true"
+    aria-label="Image viewer"
     style={{
       position: "fixed", inset: 0,
       background: theme.overlayBg,
@@ -559,6 +590,7 @@ const ImageViewer = ({ src, onClose, theme }) => (
       display: "flex", alignItems: "center", justifyContent: "center",
       zIndex: 1000, cursor: "zoom-out",
       animation: "softFadeIn 0.3s ease",
+      outline: "none",
     }}
   >
     <img src={src} alt="Enlarged" style={{
@@ -697,6 +729,12 @@ const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, ite
   return (
     <div
       onClick={onClose}
+      onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+      tabIndex={-1}
+      ref={(el) => el && el.focus()}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Settings"
       style={{
         position: "fixed", inset: 0,
         background: theme.overlayBg,
@@ -704,6 +742,7 @@ const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, ite
         zIndex: 900,
         display: "flex", alignItems: "center", justifyContent: "center",
         animation: "softFadeIn 0.25s ease",
+        outline: "none",
       }}
     >
       <div
@@ -730,13 +769,13 @@ const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, ite
             fontFamily: "'Lora', serif", fontSize: "22px", fontWeight: 400,
             margin: 0, color: theme.textSecondary,
           }}>Settings</h2>
-          <button onClick={onClose} style={{
+          <button onClick={onClose} aria-label="Close" style={{
             background: "none", border: "none", color: theme.textGhost,
             fontSize: "20px", cursor: "pointer", padding: "4px 8px",
             borderRadius: "8px", transition: "all 0.2s ease",
           }}
-          onMouseEnter={e => { e.target.style.color = theme.textMuted; e.target.style.background = theme.hoverBg; }}
-          onMouseLeave={e => { e.target.style.color = theme.textGhost; e.target.style.background = "none"; }}
+          onMouseEnter={e => { e.currentTarget.style.color = theme.textMuted; e.currentTarget.style.background = theme.hoverBg; }}
+          onMouseLeave={e => { e.currentTarget.style.color = theme.textGhost; e.currentTarget.style.background = "none"; }}
           >×</button>
         </div>
 
@@ -938,8 +977,8 @@ const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, ite
                         cursor: "pointer", fontSize: "14px", padding: "2px 6px",
                         borderRadius: "6px", transition: "all 0.2s ease",
                       }}
-                      onMouseEnter={e => { e.target.style.color = theme.deleteColor; }}
-                      onMouseLeave={e => { e.target.style.color = theme.textGhost; }}
+                      onMouseEnter={e => { e.currentTarget.style.color = theme.deleteColor; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = theme.textGhost; }}
                     >×</button>
                   </div>
                 );
@@ -950,11 +989,24 @@ const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, ite
           {/* Add new custom category form */}
           <CustomCategoryForm
             onAdd={(cat) => {
+              // Fix #16: Prevent custom category IDs from colliding with
+              // built-in types (e.g. a category called "Note" would clash
+              // with the built-in "note" type) or existing custom categories
+              const builtInTypes = ["note", "link", "task", "event", "contact", "address", "code", "photo", "finance", "recipe", "health", "recommended", "reading", "food", "idea", "person", "travel", "work", "money", "media"];
+              let newId = cat.label.toLowerCase().replace(/\s+/g, "_");
+              if (builtInTypes.includes(newId)) {
+                newId = "custom_" + newId; // prefix to avoid collision
+              }
+              // Also check for duplicates against existing custom categories
+              if (settings.customCategories.some(c => c.id === newId)) {
+                alert(`A category with the ID "${newId}" already exists.`);
+                return;
+              }
               onUpdateSettings({
                 ...settings,
                 customCategories: [...settings.customCategories, {
                   ...cat,
-                  id: cat.label.toLowerCase().replace(/\s+/g, "_"),
+                  id: newId,
                   colorIndex: settings.customCategories.length,
                 }],
               });
@@ -1096,8 +1148,8 @@ const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, ite
                 cursor: "pointer",
                 transition: "background 0.2s ease",
               }}
-              onMouseEnter={(e) => e.target.style.background = theme.deleteBg}
-              onMouseLeave={(e) => e.target.style.background = "none"}
+              onMouseEnter={(e) => e.currentTarget.style.background = theme.deleteBg}
+              onMouseLeave={(e) => e.currentTarget.style.background = "none"}
             >Log out</button>
           </div>
         )}
@@ -1562,8 +1614,8 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
                 borderRadius: "6px", transition: "all 0.25s ease",
                 fontFamily: "'DM Sans', sans-serif", fontWeight: 500,
               }}
-              onMouseEnter={e => { if (!item.pinned) { e.target.style.color = theme.textMuted; e.target.style.background = theme.hoverBg; } }}
-              onMouseLeave={e => { if (!item.pinned) { e.target.style.color = theme.textGhost; e.target.style.background = "none"; } }}
+              onMouseEnter={e => { if (!item.pinned) { e.currentTarget.style.color = theme.textMuted; e.currentTarget.style.background = theme.hoverBg; } }}
+              onMouseLeave={e => { if (!item.pinned) { e.currentTarget.style.color = theme.textGhost; e.currentTarget.style.background = "none"; } }}
               title={item.pinned ? "Unpin" : "Pin to top"}
             >{item.pinned ? "Pinned" : "Pin"}</button>
             {item.image && !item.ocrData && (
@@ -1579,8 +1631,8 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
                   fontFamily: "'DM Sans', sans-serif", fontWeight: 500,
                   animation: isScanning ? "gentlePulse 1.5s ease infinite" : "none",
                 }}
-                onMouseEnter={e => { if (!isScanning) { e.target.style.color = theme.textMuted; e.target.style.background = theme.hoverBg; } }}
-                onMouseLeave={e => { if (!isScanning) { e.target.style.color = theme.textGhost; e.target.style.background = "none"; } }}
+                onMouseEnter={e => { if (!isScanning) { e.currentTarget.style.color = theme.textMuted; e.currentTarget.style.background = theme.hoverBg; } }}
+                onMouseLeave={e => { if (!isScanning) { e.currentTarget.style.color = theme.textGhost; e.currentTarget.style.background = "none"; } }}
               >{isScanning ? "Scanning…" : "Scan"}</button>
             )}
             <button
@@ -1592,9 +1644,10 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
                 borderRadius: "6px", transition: "all 0.25s ease",
                 lineHeight: 1,
               }}
-              onMouseEnter={e => { e.target.style.color = theme.deleteColor; e.target.style.background = theme.deleteBg; }}
-              onMouseLeave={e => { e.target.style.color = theme.textGhost; e.target.style.background = "none"; }}
+              onMouseEnter={e => { e.currentTarget.style.color = theme.deleteColor; e.currentTarget.style.background = theme.deleteBg; }}
+              onMouseLeave={e => { e.currentTarget.style.color = theme.textGhost; e.currentTarget.style.background = "none"; }}
               title="Remove"
+              aria-label="Close"
             >×</button>
           </div>
         )}
@@ -1658,6 +1711,14 @@ const LoginScreen = ({ onLogin, theme, initialError }) => {
     setError("");
     setLoading(true);
 
+    // Fix #4: Client-side password validation — catch short passwords
+    // before sending to the server (faster feedback for the user)
+    if (authMode === "signup" && password.length < 8) {
+      setError("Password must be at least 8 characters");
+      setLoading(false);
+      return;
+    }
+
     try {
       const endpoint = authMode === "login" ? "/api/auth/login" : "/api/auth/signup";
       const response = await fetch(`${BACKEND_URL}${endpoint}`, {
@@ -1700,7 +1761,7 @@ const LoginScreen = ({ onLogin, theme, initialError }) => {
       fontFamily: "'DM Sans', sans-serif",
       transition: "background 0.4s ease",
     }}>
-      <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap" rel="stylesheet" />
+      {/* Fix #7: Google Fonts link moved to HTML <head> — no longer duplicated here */}
 
       <div style={{
         width: "92%",
@@ -1960,7 +2021,9 @@ function Stash() {
   const [selectedType, setSelectedType] = useState("auto");
   const [sortOrder, setSortOrder] = useState("newest");     // "newest", "oldest"
   const [undoItem, setUndoItem] = useState(null);           // recently deleted item for undo
-  const [undoTimer, setUndoTimer] = useState(null);         // timeout ref for auto-clearing undo
+  // Fix #10: useRef instead of useState for the timer — changing a timer ID
+  // doesn't need a re-render, and refs are stable across renders
+  const undoTimerRef = useRef(null);
   const [bulkMode, setBulkMode] = useState(false);          // bulk select mode
   const [bulkSelected, setBulkSelected] = useState(new Set()); // selected item IDs
   const [slidingOut, setSlidingOut] = useState(new Set());   // items currently animating out
@@ -1974,6 +2037,12 @@ function Stash() {
   });
   const inputRef = useRef(null);
   const dragCounterRef = useRef(0);
+  // Fix #9: Store items in a ref so the auto-archive effect can read
+  // current items without re-triggering itself (avoids infinite loop)
+  const itemsRef = useRef(items);
+
+  // Fix #9: Keep the ref in sync whenever items change
+  useEffect(() => { itemsRef.current = items; }, [items]);
 
   // Current theme based on settings
   const theme = settings.darkMode ? themes.dark : themes.light;
@@ -2022,12 +2091,17 @@ function Stash() {
     }
   }, [settings, isLoading]);
 
-  // Auto-archive: remove completed items older than threshold
+  // Fix #9: Auto-archive uses itemsRef.current (the ref) instead of `items`
+  // directly. If we put `items` in the dependency array, this effect would
+  // run -> call setItems -> change items -> re-run the effect (infinite loop).
+  // The ref lets us read the latest items without being a dependency.
+  // Also added `token` to the dependency array since the effect uses it.
   useEffect(() => {
     if (settings.autoArchiveDays > 0 && !isLoading && token) {
       const now = Date.now();
       const threshold = settings.autoArchiveDays * 24 * 60 * 60 * 1000;
-      const toArchive = items.filter(item =>
+      const currentItems = itemsRef.current;
+      const toArchive = currentItems.filter(item =>
         item.completed && item.completedAt &&
         (now - new Date(item.completedAt).getTime()) >= threshold
       );
@@ -2040,7 +2114,7 @@ function Stash() {
         });
       }
     }
-  }, [settings.autoArchiveDays, isLoading]);
+  }, [settings.autoArchiveDays, isLoading, token]);
 
   // Drag & drop
   const handleDragEnter = useCallback((e) => {
@@ -2162,6 +2236,10 @@ function Stash() {
     }
   };
 
+  // Fix #11: The server DELETE is now delayed until AFTER the undo window
+  // expires. If the user clicks "undo", we cancel the timer so the DELETE
+  // never fires. This avoids the old race condition where we'd delete on
+  // the server immediately, then re-create on undo (fragile and lossy).
   const deleteItem = (id) => {
     const item = items.find(i => i.id === id);
     // Trigger slide-out animation
@@ -2169,20 +2247,27 @@ function Stash() {
     setTimeout(() => {
       setSlidingOut(prev => { const next = new Set(prev); next.delete(id); return next; });
       setItems(prev => prev.filter(i => i.id !== id));
-      // Sync to server
-      apiFetch(`/api/stashes/${id}`, { method: "DELETE" })
-        .catch(err => console.error("[Sync] Delete failed:", err.message));
 
-      // Set up undo
+      // Set up undo — server DELETE happens only after the 5s undo window
       if (item) {
         setUndoItem({ items: [item], label: "Deleted" });
-        if (undoTimer) clearTimeout(undoTimer);
-        const timer = setTimeout(() => { setUndoItem(null); }, 5000);
-        setUndoTimer(timer);
+        // Fix #10: use undoTimerRef instead of state
+        if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+        undoTimerRef.current = setTimeout(() => {
+          setUndoItem(null);
+          // NOW it's safe to delete on the server — undo window expired
+          apiFetch(`/api/stashes/${id}`, { method: "DELETE" })
+            .catch(err => console.error("[Sync] Delete failed:", err.message));
+        }, 5000);
+      } else {
+        // No item found (shouldn't happen), delete immediately
+        apiFetch(`/api/stashes/${id}`, { method: "DELETE" })
+          .catch(err => console.error("[Sync] Delete failed:", err.message));
       }
     }, 300); // match animation duration
   };
 
+  // Fix #11: Same deferred-delete pattern for bulk deletes
   const deleteMultiple = (ids) => {
     const deletedItems = items.filter(i => ids.has(i.id));
     // Trigger slide-out for all
@@ -2190,19 +2275,26 @@ function Stash() {
     setTimeout(() => {
       setSlidingOut(new Set());
       setItems(prev => prev.filter(i => !ids.has(i.id)));
-      // Sync to server
-      ids.forEach(id => {
-        apiFetch(`/api/stashes/${id}`, { method: "DELETE" })
-          .catch(err => console.error("[Sync] Delete failed:", err.message));
-      });
       setBulkSelected(new Set());
       setBulkMode(false);
 
       if (deletedItems.length > 0) {
         setUndoItem({ items: deletedItems, label: `Deleted ${deletedItems.length} items` });
-        if (undoTimer) clearTimeout(undoTimer);
-        const timer = setTimeout(() => { setUndoItem(null); }, 5000);
-        setUndoTimer(timer);
+        if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+        undoTimerRef.current = setTimeout(() => {
+          setUndoItem(null);
+          // Server deletes happen after undo window expires
+          ids.forEach(id => {
+            apiFetch(`/api/stashes/${id}`, { method: "DELETE" })
+              .catch(err => console.error("[Sync] Delete failed:", err.message));
+          });
+        }, 5000);
+      } else {
+        // No items to undo, delete immediately
+        ids.forEach(id => {
+          apiFetch(`/api/stashes/${id}`, { method: "DELETE" })
+            .catch(err => console.error("[Sync] Delete failed:", err.message));
+        });
       }
     }, 300);
   };
@@ -2223,18 +2315,15 @@ function Stash() {
     setBulkMode(false);
   };
 
+  // Fix #11: Undo now just cancels the timer — the server DELETE never fires.
+  // No need to re-POST because the item was never deleted from the server!
   const restoreItem = () => {
     if (undoItem) {
       setItems(prev => [...undoItem.items, ...prev]);
-      // Re-create on server (items were already deleted by the sync call)
-      undoItem.items.forEach(item => {
-        apiFetch("/api/stashes", {
-          method: "POST",
-          body: JSON.stringify(item),
-        }).catch(err => console.error("[Sync] Restore failed:", err.message));
-      });
       setUndoItem(null);
-      if (undoTimer) clearTimeout(undoTimer);
+      // Cancel the timer so the server DELETE never happens
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
     }
   };
 
@@ -2246,26 +2335,33 @@ function Stash() {
     });
   };
 
+  // Fix #11: Same deferred-delete pattern for clearing all completed
   const clearAllCompleted = () => {
     const completedIds = items.filter(i => i.completed).map(i => i.id);
     const deletedItems = items.filter(i => i.completed);
-    
+
     setSlidingOut(prev => { const next = new Set(prev); completedIds.forEach(id => next.add(id)); return next; });
     setTimeout(() => {
       setSlidingOut(new Set());
       setItems(prev => prev.filter(i => !i.completed));
-      // Sync to server
-      completedIds.forEach(id => {
-        apiFetch(`/api/stashes/${id}`, { method: "DELETE" })
-          .catch(err => console.error("[Sync] Delete failed:", err.message));
-      });
       setConfirmClearAll(false);
 
       if (deletedItems.length > 0) {
         setUndoItem({ items: deletedItems, label: `Cleared ${deletedItems.length} completed` });
-        if (undoTimer) clearTimeout(undoTimer);
-        const timer = setTimeout(() => { setUndoItem(null); }, 5000);
-        setUndoTimer(timer);
+        if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+        undoTimerRef.current = setTimeout(() => {
+          setUndoItem(null);
+          // Server deletes after undo window expires
+          completedIds.forEach(id => {
+            apiFetch(`/api/stashes/${id}`, { method: "DELETE" })
+              .catch(err => console.error("[Sync] Delete failed:", err.message));
+          });
+        }, 5000);
+      } else {
+        completedIds.forEach(id => {
+          apiFetch(`/api/stashes/${id}`, { method: "DELETE" })
+            .catch(err => console.error("[Sync] Delete failed:", err.message));
+        });
       }
     }, 300);
   };
@@ -2436,7 +2532,7 @@ function Stash() {
         fontStyle: "italic", fontSize: "15px",
         transition: "background 0.4s ease",
       }}>
-        <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap" rel="stylesheet" />
+        {/* Fix #7: Google Fonts link moved to HTML <head> — no longer duplicated here */}
         opening your stash…
       </div>
     );
@@ -2462,7 +2558,7 @@ function Stash() {
         transition: "background 0.4s ease, color 0.4s ease",
       }}
     >
-      <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap" rel="stylesheet" />
+      {/* Fix #7: Google Fonts link moved to HTML <head> — no longer duplicated here */}
       <style>{`
         @keyframes cardIn {
           from { opacity: 0; transform: translateY(6px); }
@@ -2548,13 +2644,26 @@ function Stash() {
         onExportFull={() => exportDataFull(items, settings)}
         onImport={(data) => {
           if (data?.items && Array.isArray(data.items)) {
-            setItems(data.items);
-            if (data.settings) setSettings(prev => ({ ...prev, ...data.settings }));
+            // Fix #19: Validate each imported item has required fields
+            // so corrupt or malicious data doesn't break the app
+            const validItem = (item) => item && typeof item.id === 'string' && typeof item.content === 'string';
+            const validItems = data.items.filter(validItem);
+            if (validItems.length < data.items.length) {
+              console.warn(`[Import] Skipped ${data.items.length - validItems.length} invalid items`);
+            }
+            setItems(validItems);
+            // Fix #19: Whitelist allowed settings keys instead of spreading everything
+            if (data.settings) {
+              const allowedKeys = ['timezone', 'customCategories', 'darkMode', 'autoArchiveDays', 'showCompleted'];
+              const safeSettings = {};
+              allowedKeys.forEach(key => { if (data.settings[key] !== undefined) safeSettings[key] = data.settings[key]; });
+              setSettings(prev => ({ ...prev, ...safeSettings }));
+            }
             setSettingsOpen(false);
-            // Sync imported items to server
+            // Sync validated items to server
             apiFetch("/api/stashes/import", {
               method: "POST",
-              body: JSON.stringify({ stashes: data.items }),
+              body: JSON.stringify({ stashes: validItems }),
             }).then(() => {
               // Re-fetch from server to get canonical state
               return apiFetch("/api/stashes");
@@ -2768,6 +2877,7 @@ function Stash() {
                 type="text" value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search your memories…"
+                aria-label="Search stashes"
                 style={{
                   flex: 1, background: "none", border: "none",
                   color: theme.textPrimary, fontSize: "14px",
@@ -2782,7 +2892,7 @@ function Stash() {
               )}
             </div>
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-              <button onClick={() => setFilterType("all")} style={{
+              <button onClick={() => setFilterType("all")} aria-pressed={filterType === "all"} style={{
                 background: filterType === "all" ? theme.cardBg : "transparent",
                 border: filterType === "all" ? `1px solid ${theme.border}` : "1px solid transparent",
                 boxShadow: filterType === "all" ? theme.shadowLight : "none",
@@ -2797,6 +2907,7 @@ function Stash() {
                 return (
                   <button key={type}
                     onClick={() => setFilterType(isActive ? "all" : type)}
+                    aria-pressed={isActive}
                     style={{
                       background: isActive ? colors.bg : "transparent",
                       border: isActive ? `1px solid ${colors.color}33` : "1px solid transparent",
@@ -3003,6 +3114,7 @@ function Stash() {
                   }}>
                     <button
                       onClick={() => setCompletedExpanded(prev => !prev)}
+                      aria-expanded={completedExpanded}
                       style={{
                         background: "none", border: "none", cursor: "pointer",
                         display: "flex", alignItems: "center", gap: "8px",
@@ -3151,9 +3263,9 @@ function Stash() {
       {/* PWA Install Banner */}
       {!undoItem && <InstallBanner theme={theme} />}
 
-      {/* Undo delete toast */}
+      {/* Undo delete toast — role="alert" makes screen readers announce this immediately */}
       {undoItem && (
-        <div style={{
+        <div role="alert" aria-live="assertive" style={{
           position: "fixed", bottom: "24px", left: "50%", transform: "translateX(-50%)",
           background: theme.cardBg, border: `1px solid ${theme.border}`,
           borderRadius: "14px", padding: "10px 12px 10px 18px",
@@ -3203,14 +3315,15 @@ function InstallBanner({ theme }) {
     };
   }, []);
 
+  // Fix #15: Use window.deferredPrompt consistently (matches the global listener)
   const handleInstall = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const result = await deferredPrompt.userChoice;
+    if (!window.deferredPrompt) return;
+    window.deferredPrompt.prompt();
+    const result = await window.deferredPrompt.userChoice;
     if (result.outcome === "accepted") {
       console.log("[PWA] User accepted install");
     }
-    deferredPrompt = null;
+    window.deferredPrompt = null;
     setCanInstall(false);
   };
 
@@ -3249,6 +3362,7 @@ function InstallBanner({ theme }) {
       >Install</button>
       <button
         onClick={() => setDismissed(true)}
+        aria-label="Close"
         style={{
           background: "none", border: "none",
           color: theme.textGhost, fontSize: "18px",
