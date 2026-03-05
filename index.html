@@ -1426,6 +1426,147 @@ const HighlightText = ({ text, query, theme }) => {
 };
 
 // ============================================================
+// REMINDER PICKER
+//
+// A small modal that appears when you click "Remind" on a card.
+// Offers preset quick-pick times (1hr, 3hr, tomorrow, next week)
+// plus a custom date/time input. Using presets is much faster
+// than manually picking a date — most reminders are "soon."
+//
+// NEW CONCEPT: "Notification API"
+// Browsers can show native notifications (the ones that pop up
+// in your OS notification center). We must ASK for permission
+// first. If the user denies it, reminders still work internally
+// but won't show a system notification.
+// ============================================================
+const ReminderPicker = ({ onPick, onClose, theme }) => {
+  const [customDate, setCustomDate] = useState("");
+  const [customTime, setCustomTime] = useState("");
+
+  // Presets give users one-tap options for common reminder intervals.
+  // Each preset either uses a millisecond offset (ms) or a getDate()
+  // function for absolute times (like "tomorrow at 9 AM").
+  const presets = [
+    { label: "In 1 hour", ms: 60 * 60 * 1000 },
+    { label: "In 3 hours", ms: 3 * 60 * 60 * 1000 },
+    { label: "Tomorrow 9 AM", getDate: () => {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      d.setHours(9, 0, 0, 0);
+      return d;
+    }},
+    { label: "Next week", getDate: () => {
+      const d = new Date();
+      d.setDate(d.getDate() + 7);
+      d.setHours(9, 0, 0, 0);
+      return d;
+    }},
+  ];
+
+  return (
+    // Outer overlay — clicking the backdrop closes the picker
+    <div onClick={onClose} style={{
+      position: "fixed", inset: 0, background: theme.overlayBg,
+      backdropFilter: "blur(8px)", zIndex: 950,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      animation: "softFadeIn 0.2s ease",
+    }}>
+      {/* Inner card — stopPropagation prevents clicks inside from closing */}
+      <div onClick={e => e.stopPropagation()} style={{
+        background: theme.settingsBg, borderRadius: "20px",
+        border: `1px solid ${theme.border}`,
+        padding: "28px 24px", width: "92%", maxWidth: "340px",
+        boxShadow: theme.shadowHover,
+        animation: "settingsIn 0.3s ease",
+      }}>
+        <h3 style={{
+          fontFamily: "'Lora', serif", fontSize: "18px", fontWeight: 400,
+          color: theme.textSecondary, margin: "0 0 18px",
+        }}>Set Reminder</h3>
+
+        {/* Quick presets — stacked vertically for easy tapping on mobile */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "18px" }}>
+          {presets.map(preset => (
+            <button key={preset.label}
+              onClick={() => {
+                // If the preset has a getDate function, use it;
+                // otherwise add the ms offset to "right now"
+                const date = preset.getDate
+                  ? preset.getDate()
+                  : new Date(Date.now() + preset.ms);
+                onPick(date.toISOString());
+              }}
+              style={{
+                background: theme.hoverBg, border: `1px solid ${theme.border}`,
+                color: theme.textSecondary, borderRadius: "10px",
+                padding: "10px 16px", fontSize: "13px",
+                fontFamily: "'DM Sans', sans-serif",
+                cursor: "pointer", textAlign: "left",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = theme.borderHover; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = theme.border; }}
+            >{preset.label}</button>
+          ))}
+        </div>
+
+        {/* Custom date/time — for when presets don't fit.
+            Uses native HTML date/time inputs which show platform pickers. */}
+        <div style={{
+          borderTop: `1px solid ${theme.border}`, paddingTop: "16px",
+        }}>
+          <div style={{
+            fontFamily: "'DM Sans', sans-serif", fontSize: "12px",
+            color: theme.textMuted, marginBottom: "8px", fontWeight: 500,
+          }}>Custom time</div>
+          <div style={{ display: "flex", gap: "8px", marginBottom: "10px" }}>
+            <input type="date" value={customDate} onChange={e => setCustomDate(e.target.value)}
+              style={{
+                flex: 1, background: theme.hoverBg, border: `1px solid ${theme.border}`,
+                borderRadius: "8px", padding: "7px 10px", color: theme.textPrimary,
+                fontSize: "12px", fontFamily: "'DM Sans', sans-serif",
+              }}
+            />
+            <input type="time" value={customTime} onChange={e => setCustomTime(e.target.value)}
+              style={{
+                width: "110px", background: theme.hoverBg, border: `1px solid ${theme.border}`,
+                borderRadius: "8px", padding: "7px 10px", color: theme.textPrimary,
+                fontSize: "12px", fontFamily: "'DM Sans', sans-serif",
+              }}
+            />
+          </div>
+          <button
+            onClick={() => {
+              if (customDate && customTime) {
+                // Combine date + time into a full ISO string
+                onPick(new Date(`${customDate}T${customTime}`).toISOString());
+              }
+            }}
+            disabled={!customDate || !customTime}
+            style={{
+              background: (customDate && customTime) ? theme.accentGradient : theme.disabledBg,
+              border: "none",
+              color: (customDate && customTime) ? "#FAF7F2" : theme.disabledText,
+              borderRadius: "10px", padding: "8px 18px", fontSize: "13px",
+              fontFamily: "'DM Sans', sans-serif", fontWeight: 500,
+              cursor: (customDate && customTime) ? "pointer" : "default",
+            }}
+          >Set reminder</button>
+        </div>
+
+        {/* Cancel button */}
+        <button onClick={onClose} style={{
+          display: "block", margin: "16px auto 0",
+          background: "none", border: "none",
+          color: theme.textGhost, fontSize: "13px",
+          fontFamily: "'DM Sans', sans-serif", cursor: "pointer",
+        }}>Cancel</button>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
 // STASH CARD — with inline editing!
 //
 // NEW CONCEPT: "Inline editing"
@@ -1438,7 +1579,7 @@ const HighlightText = ({ text, query, theme }) => {
 // The card manages its own edit mode independently — this is
 // called "component-level state" vs "app-level state."
 // ============================================================
-const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTogglePin, onScanCard, isScanning, theme, timezone, customCategories, isSlidingOut, bulkMode, isSelected, onToggleBulkSelect, searchQuery }) => {
+const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTogglePin, onSetReminder, onScanCard, isScanning, theme, timezone, customCategories, isSlidingOut, bulkMode, isSelected, onToggleBulkSelect, searchQuery }) => {
   const typeInfo = getTypeInfo(item.type, customCategories);
   const typeColors = getTypeColors(item.type, theme, customCategories);
   const isCompleted = item.completed;
@@ -1648,6 +1789,16 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
                 fontFamily: "'DM Sans', sans-serif",
                 fontStyle: "italic",
               }}>scanned</span>
+            )}
+            {/* Reminder indicator — shows when a reminder is set on this card.
+                Changes color to red (deleteColor) if the reminder is overdue. */}
+            {item.reminder && !isCompleted && (
+              <span style={{
+                fontSize: "11px",
+                color: new Date(item.reminder) <= new Date() ? theme.deleteColor : theme.textMuted,
+                fontFamily: "'DM Sans', sans-serif",
+                fontStyle: "italic",
+              }}>&#x23F0; {new Date(item.reminder).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
             )}
           </div>
 
@@ -1893,6 +2044,32 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
               onMouseLeave={e => { if (!item.pinned) { e.currentTarget.style.color = theme.textGhost; e.currentTarget.style.background = "none"; } }}
               title={item.pinned ? "Unpin" : "Pin to top"}
             >{item.pinned ? "Pinned" : "Pin"}</button>
+            {/* Reminder button — lets users set a future time to be notified about this stash.
+                Uses the browser's Notification API to send a desktop/mobile alert.
+                If a reminder is already set, clicking clears it (toggle behavior). */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                // If already has a reminder, clicking again clears it
+                if (item.reminder) {
+                  onSetReminder(item.id, null);
+                } else {
+                  onSetReminder(item.id, "pick");
+                }
+              }}
+              style={{
+                background: item.reminder ? theme.checkBg : "none",
+                border: "none",
+                color: item.reminder ? theme.checkColor : theme.textGhost,
+                cursor: "pointer",
+                fontSize: "11px", padding: "4px 8px",
+                borderRadius: "6px", transition: "all 0.25s ease",
+                fontFamily: "'DM Sans', sans-serif", fontWeight: 500,
+              }}
+              onMouseEnter={e => { if (!item.reminder) { e.currentTarget.style.color = theme.textMuted; e.currentTarget.style.background = theme.hoverBg; } }}
+              onMouseLeave={e => { if (!item.reminder) { e.currentTarget.style.color = theme.textGhost; e.currentTarget.style.background = "none"; } }}
+              title={item.reminder ? `Reminder: ${new Date(item.reminder).toLocaleString()}` : "Set reminder"}
+            >{item.reminder ? "\u23F0" : "Remind"}</button>
             {item.image && !item.ocrData && (
               <button
                 onClick={() => onScanCard(item.id)}
@@ -2353,6 +2530,9 @@ function Stash() {
   const [bulkSelected, setBulkSelected] = useState(new Set()); // selected item IDs
   const [slidingOut, setSlidingOut] = useState(new Set());   // items currently animating out
   const [confirmClearAll, setConfirmClearAll] = useState(false); // confirm before clearing completed
+  // Reminder state — tracks which item's ReminderPicker modal is open.
+  // null means no picker is showing; an item ID means "show picker for this card."
+  const [reminderPickerId, setReminderPickerId] = useState(null);
   const [settings, setSettings] = useState({
     darkMode: false,
     autoArchiveDays: 0,
@@ -2404,6 +2584,7 @@ function Stash() {
       // Escape handlers, but those only work when those elements have
       // focus. This global handler catches Escape from anywhere.
       if (e.key === "Escape") {
+        if (reminderPickerId)   { setReminderPickerId(null); return; }
         if (viewingImage)       { setViewingImage(null);  return; }
         if (settingsOpen)       { setSettingsOpen(false);  return; }
         if (searchQuery)        { setSearchQuery("");      return; }
@@ -2429,7 +2610,7 @@ function Stash() {
     return () => document.removeEventListener("keydown", handleGlobalKeyDown);
   // The dependency array lists every piece of state the handler reads.
   // When any of these change, React re-creates the listener with fresh values.
-  }, [viewingImage, settingsOpen, searchQuery]);
+  }, [viewingImage, settingsOpen, searchQuery, reminderPickerId]);
 
   // Current theme based on settings
   const theme = settings.darkMode ? themes.dark : themes.light;
@@ -2829,6 +3010,79 @@ function Stash() {
     }).catch(err => console.error("[Sync] Update failed:", err.message));
   };
 
+  // ── Reminder logic ──────────────────────────────────────────
+  // Handle setting or clearing a reminder on a stash item.
+  // When value is "pick", we open the ReminderPicker modal.
+  // When value is an ISO date string, we save it to the item.
+  // When value is null, we clear the reminder.
+  const setReminder = (id, value) => {
+    if (value === "pick") {
+      // Open the picker modal for this item
+      setReminderPickerId(id);
+      return;
+    }
+    // Set or clear the reminder on the item
+    setItems(prev => prev.map(item =>
+      item.id === id ? { ...item, reminder: value } : item
+    ));
+    setReminderPickerId(null);
+
+    // Sync to server — the backend stores reminder as part of the stash
+    apiFetch(`/api/stashes/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ reminder: value }),
+    }).catch(err => console.error("[Sync] Reminder update failed:", err.message));
+
+    // NEW CONCEPT: "Notification.requestPermission()"
+    // The first time a user sets a reminder, we ask the browser for
+    // permission to show notifications. The browser shows a popup like
+    // "Allow notifications?" — the user must click Allow for it to work.
+    // We only ask once (when permission is "default" = not yet decided).
+    if (value && "Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  };
+
+  // Check for due reminders every 30 seconds.
+  // This useEffect sets up a recurring timer (setInterval) that scans
+  // all items looking for reminders whose time has passed. When found,
+  // it fires a browser notification and clears the reminder.
+  //
+  // NEW CONCEPT: "setInterval + cleanup"
+  // setInterval runs a function repeatedly. The cleanup function
+  // (returned by useEffect) calls clearInterval to stop it when the
+  // component unmounts — without this, the timer would keep running
+  // forever, causing a "memory leak."
+  useEffect(() => {
+    const checkReminders = () => {
+      const now = new Date();
+      items.forEach(item => {
+        if (item.reminder && new Date(item.reminder) <= now && !item.completed) {
+          // Fire a browser notification if we have permission
+          if ("Notification" in window && Notification.permission === "granted") {
+            new Notification("Stash Reminder", {
+              body: item.content?.substring(0, 100) || "You have a reminder!",
+              icon: "/icon-192.png",
+            });
+          }
+          // Clear the reminder after firing so it doesn't fire again
+          setItems(prev => prev.map(i =>
+            i.id === item.id ? { ...i, reminder: null } : i
+          ));
+          // Also clear on the server
+          apiFetch(`/api/stashes/${item.id}`, {
+            method: "PUT",
+            body: JSON.stringify({ reminder: null }),
+          }).catch(err => console.error("[Sync] Reminder clear failed:", err.message));
+        }
+      });
+    };
+
+    const timer = setInterval(checkReminders, 30000); // every 30 seconds
+    checkReminders(); // also check immediately on mount / items change
+    return () => clearInterval(timer); // cleanup: stop the timer
+  }, [items]);
+
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addItem(); }
     if (e.key === "Escape" && pendingImage) setPendingImage(null);
@@ -3067,6 +3321,16 @@ function Stash() {
         onLogout={handleLogout}
         onSaveDigestSettings={saveDigestSettings}
       />
+
+      {/* Reminder Picker modal — shown when user clicks "Remind" on a card.
+          reminderPickerId is the ID of the card being reminded. When null, nothing shows. */}
+      {reminderPickerId && (
+        <ReminderPicker
+          onPick={(isoDate) => setReminder(reminderPickerId, isoDate)}
+          onClose={() => setReminderPickerId(null)}
+          theme={theme}
+        />
+      )}
 
       {/* ===== MAIN CONTENT — 720px max gives cards more breathing room on desktop ===== */}
       <div style={{
@@ -3501,6 +3765,7 @@ function Stash() {
                           onToggleComplete={toggleComplete}
                           onEdit={editItem}
                           onTogglePin={togglePin}
+                          onSetReminder={setReminder}
                           onScanCard={scanBusinessCard}
                           isScanning={scanningId === item.id}
                           onViewImage={src => setViewingImage(src)}
@@ -3648,6 +3913,7 @@ function Stash() {
                           onToggleComplete={toggleComplete}
                           onEdit={editItem}
                           onTogglePin={togglePin}
+                          onSetReminder={setReminder}
                           onScanCard={scanBusinessCard}
                           isScanning={scanningId === item.id}
                           onViewImage={src => setViewingImage(src)}
