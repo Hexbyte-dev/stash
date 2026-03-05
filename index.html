@@ -2778,13 +2778,13 @@ function Stash() {
   const [bulkSelected, setBulkSelected] = useState(new Set()); // selected item IDs
 
   // ── Advanced filter state ──────────────────────────────────
-  // These four pieces of state power the collapsible "Advanced Filters"
-  // panel.  They live alongside the other filter state (searchQuery,
-  // filterType, sortOrder) so the filteredItems memo can reference them.
-  const [advancedOpen, setAdvancedOpen] = useState(false);   // is the panel expanded?
-  const [dateFrom, setDateFrom] = useState("");              // ISO date string, e.g. "2026-03-01"
-  const [dateTo, setDateTo] = useState("");                  // ISO date string for the end date
-  const [tagFilter, setTagFilter] = useState("");            // comma-separated tag names
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [tagFilter, setTagFilter] = useState("");
+  // New state for enhanced bulk operations:
+  const [bulkTagInput, setBulkTagInput] = useState("");
+  const [bulkRetypeOpen, setBulkRetypeOpen] = useState(false);
   const [slidingOut, setSlidingOut] = useState(new Set());   // items currently animating out
   const [confirmClearAll, setConfirmClearAll] = useState(false); // confirm before clearing completed
   const [settings, setSettings] = useState({
@@ -3136,6 +3136,95 @@ function Stash() {
         body: JSON.stringify({ completed: true, completedAt }),
       }).catch(err => console.error("[Sync] Update failed:", err.message));
     });
+    setBulkSelected(new Set());
+    setBulkMode(false);
+  };
+
+  // ============================================================
+  // BULK TAG
+  //
+  // Adds tags to multiple items at once. Unlike single-item editing
+  // where you replace all tags, bulk tagging ADDS new tags without
+  // removing existing ones. This is called a "union" operation.
+  //
+  // NEW CONCEPT: "Set union"
+  // We combine existing tags with new tags, then remove duplicates
+  // using [...new Set(...)]. A Set automatically ignores duplicates,
+  // so ["recipe", "italian", "recipe"] becomes ["recipe", "italian"].
+  // ============================================================
+  const bulkAddTags = (ids, newTags) => {
+    setItems(prev => prev.map(item => {
+      if (!ids.has(item.id)) return item;
+      // Union: combine existing tags with new ones, deduplicate
+      const merged = [...new Set([...(item.tags || []), ...newTags])];
+      return { ...item, tags: merged };
+    }));
+    // Sync each to server
+    ids.forEach(id => {
+      const item = items.find(i => i.id === id);
+      if (item) {
+        const merged = [...new Set([...(item.tags || []), ...newTags])];
+        apiFetch(`/api/stashes/${id}`, {
+          method: "PUT",
+          body: JSON.stringify({ tags: merged }),
+        }).catch(err => console.error("[Sync] Bulk tag failed:", err.message));
+      }
+    });
+    setBulkSelected(new Set());
+    setBulkMode(false);
+  };
+
+  // ============================================================
+  // BULK RE-TYPE
+  //
+  // Changes the type/category of multiple items at once.
+  // Useful when auto-detection got it wrong for several items.
+  // ============================================================
+  const bulkRetype = (ids, newType) => {
+    setItems(prev => prev.map(item =>
+      ids.has(item.id) ? { ...item, type: newType } : item
+    ));
+    // Sync each to server
+    ids.forEach(id => {
+      apiFetch(`/api/stashes/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ type: newType }),
+      }).catch(err => console.error("[Sync] Bulk retype failed:", err.message));
+    });
+    setBulkSelected(new Set());
+    setBulkMode(false);
+  };
+
+  // ============================================================
+  // BULK EXPORT
+  //
+  // Exports only the selected items as a JSON backup file.
+  // Reuses the same Blob + download pattern from exportData().
+  //
+  // NEW CONCEPT: "Blob + object URL"
+  // A Blob is an in-memory file. We create a temporary URL for it,
+  // simulate a click on an invisible <a> tag, then clean up.
+  // ============================================================
+  const bulkExport = (ids) => {
+    const selected = items.filter(i => ids.has(i.id));
+    const exportObj = {
+      exportDate: new Date().toISOString(),
+      version: APP_VERSION,
+      itemCount: selected.length,
+      items: selected.map(({ image, ...rest }) => ({
+        ...rest,
+        hasImage: !!image,
+      })),
+    };
+    const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `stash-selection-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
     setBulkSelected(new Set());
     setBulkMode(false);
   };
@@ -3828,21 +3917,68 @@ function Stash() {
             </div>
             {/* Sort toggle + Bulk mode */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "8px" }}>
-              <button
-                onClick={() => { setBulkMode(prev => !prev); setBulkSelected(new Set()); }}
-                style={{
-                  background: bulkMode ? theme.accent + "18" : "none",
-                  border: bulkMode ? `1px solid ${theme.accent}33` : "1px solid transparent",
-                  cursor: "pointer",
-                  color: bulkMode ? theme.accent : theme.textMuted,
-                  fontSize: "12px",
-                  fontFamily: "'DM Sans', sans-serif",
-                  padding: "3px 10px", borderRadius: "8px",
-                  transition: "all 0.2s ease",
-                }}
-              >
-                {bulkMode ? `${bulkSelected.size} selected` : "Select"}
-              </button>
+              {/* ============================================================
+                  SELECT / SELECT ALL / NONE BUTTONS
+
+                  The main "Select" button toggles bulk mode on/off.
+                  When bulk mode is active, "All" and "None" appear beside it:
+                  - "All" adds every currently VISIBLE (filtered) item to the
+                    selection. This is useful when you want to act on most items
+                    — select all, then deselect a few.
+                  - "None" clears the selection without leaving bulk mode.
+                  ============================================================ */}
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <button
+                  onClick={() => { setBulkMode(prev => !prev); setBulkSelected(new Set()); setBulkRetypeOpen(false); setBulkTagInput(""); }}
+                  style={{
+                    background: bulkMode ? theme.accent + "18" : "none",
+                    border: bulkMode ? `1px solid ${theme.accent}33` : "1px solid transparent",
+                    cursor: "pointer",
+                    color: bulkMode ? theme.accent : theme.textMuted,
+                    fontSize: "12px",
+                    fontFamily: "'DM Sans', sans-serif",
+                    padding: "3px 10px", borderRadius: "8px",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  {bulkMode ? `${bulkSelected.size} selected` : "Select"}
+                </button>
+
+                {/* Select All / None — only visible when bulk mode is active.
+                    "Select All" adds every visible (filtered) item ID to the set.
+                    "None" clears the set. This saves time when you want to
+                    act on most items — select all, then deselect a few. */}
+                {bulkMode && (
+                  <>
+                    <button
+                      onClick={() => {
+                        // Add all currently VISIBLE (filtered) item IDs to selection
+                        const allIds = new Set(filteredItems.map(i => i.id));
+                        setBulkSelected(allIds);
+                      }}
+                      style={{
+                        background: "none", border: "none", cursor: "pointer",
+                        color: theme.textMuted, fontSize: "11px",
+                        fontFamily: "'DM Sans', sans-serif",
+                        padding: "2px 6px", textDecoration: "underline",
+                        textDecorationColor: theme.border,
+                        textUnderlineOffset: "2px",
+                      }}
+                    >All</button>
+                    <button
+                      onClick={() => setBulkSelected(new Set())}
+                      style={{
+                        background: "none", border: "none", cursor: "pointer",
+                        color: theme.textMuted, fontSize: "11px",
+                        fontFamily: "'DM Sans', sans-serif",
+                        padding: "2px 6px", textDecoration: "underline",
+                        textDecorationColor: theme.border,
+                        textUnderlineOffset: "2px",
+                      }}
+                    >None</button>
+                  </>
+                )}
+              </div>
               <button
                 onClick={() => setSortOrder(prev => prev === "newest" ? "oldest" : "newest")}
                 style={{
@@ -3858,24 +3994,7 @@ function Stash() {
               </button>
             </div>
 
-            {/* ── Advanced Filters ───────────────────────────────────
-                A collapsible panel that reveals date-range and multi-tag
-                filtering controls.  It sits below the sort row and above
-                the bulk-action bar so it doesn't interrupt the main
-                workflow.
-
-                KEY CONCEPTS FOR BEGINNERS:
-                • The ▸ arrow rotates via a CSS transform when the panel
-                  is open — a cheap micro-animation that signals
-                  expandability.
-                • The "active" badge only appears when at least one
-                  filter has a value, using a short-circuit expression:
-                  `(condition) && <JSX>`.
-                • Native <input type="date"> gives us a free calendar
-                  picker on every modern browser — no library needed!
-                • The Clear Filters button also only renders when one or
-                  more filters are set, keeping the UI tidy by default.
-            */}
+            {/* ── Advanced Filters ─────────────────────────────────── */}
             <div style={{ marginTop: "8px" }}>
               <button
                 onClick={() => setAdvancedOpen(prev => !prev)}
@@ -3996,30 +4115,137 @@ function Stash() {
               )}
             </div>
 
-            {/* Bulk action bar */}
+            {/* Bulk action bar — enhanced with tag, re-type, export */}
             {bulkMode && bulkSelected.size > 0 && (
               <div style={{
-                display: "flex", gap: "8px", marginTop: "10px",
+                marginTop: "10px", padding: "12px",
+                background: theme.cardBg, borderRadius: "12px",
+                border: `1px solid ${theme.border}`,
                 animation: "softFadeIn 0.2s ease forwards",
               }}>
-                <button
-                  onClick={() => completeMultiple(bulkSelected)}
-                  style={{
-                    background: theme.checkBg, border: `1px solid ${theme.checkColor}44`,
-                    color: theme.checkColor, cursor: "pointer",
-                    fontSize: "12px", fontFamily: "'DM Sans', sans-serif", fontWeight: 500,
-                    padding: "5px 14px", borderRadius: "8px", transition: "all 0.2s ease",
-                  }}
-                >Complete {bulkSelected.size}</button>
-                <button
-                  onClick={() => deleteMultiple(bulkSelected)}
-                  style={{
-                    background: theme.deleteBg, border: `1px solid ${theme.deleteColor}44`,
-                    color: theme.deleteColor, cursor: "pointer",
-                    fontSize: "12px", fontFamily: "'DM Sans', sans-serif", fontWeight: 500,
-                    padding: "5px 14px", borderRadius: "8px", transition: "all 0.2s ease",
-                  }}
-                >Delete {bulkSelected.size}</button>
+                {/* Row 1: Primary actions */}
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "10px" }}>
+                  <button
+                    onClick={() => completeMultiple(bulkSelected)}
+                    style={{
+                      background: theme.checkBg, border: `1px solid ${theme.checkColor}44`,
+                      color: theme.checkColor, cursor: "pointer",
+                      fontSize: "12px", fontFamily: "'DM Sans', sans-serif", fontWeight: 500,
+                      padding: "5px 14px", borderRadius: "8px", transition: "all 0.2s ease",
+                    }}
+                  >&#10003; Complete</button>
+                  <button
+                    onClick={() => deleteMultiple(bulkSelected)}
+                    style={{
+                      background: theme.deleteBg, border: `1px solid ${theme.deleteColor}44`,
+                      color: theme.deleteColor, cursor: "pointer",
+                      fontSize: "12px", fontFamily: "'DM Sans', sans-serif", fontWeight: 500,
+                      padding: "5px 14px", borderRadius: "8px", transition: "all 0.2s ease",
+                    }}
+                  >&times; Delete</button>
+                  <button
+                    onClick={() => bulkExport(bulkSelected)}
+                    style={{
+                      background: theme.hoverBg, border: `1px solid ${theme.border}`,
+                      color: theme.textSecondary, cursor: "pointer",
+                      fontSize: "12px", fontFamily: "'DM Sans', sans-serif", fontWeight: 500,
+                      padding: "5px 14px", borderRadius: "8px", transition: "all 0.2s ease",
+                    }}
+                  >&darr; Export</button>
+                </div>
+
+                {/* Row 2: Bulk tag — type comma-separated tags then press Enter or click Tag.
+                    Tags are ADDED to existing tags (union), not replaced. */}
+                <div style={{
+                  display: "flex", gap: "6px", alignItems: "center",
+                  marginBottom: "8px",
+                }}>
+                  <input
+                    type="text" value={bulkTagInput}
+                    onChange={e => setBulkTagInput(e.target.value)}
+                    placeholder="Add tags (comma-separated)"
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && bulkTagInput.trim()) {
+                        // Split by comma, trim whitespace, lowercase, remove empties
+                        const tags = bulkTagInput.split(",").map(t => t.trim().toLowerCase()).filter(t => t.length > 0);
+                        bulkAddTags(bulkSelected, tags);
+                        setBulkTagInput("");
+                      }
+                    }}
+                    style={{
+                      flex: 1, background: theme.hoverBg,
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: "8px", padding: "6px 10px",
+                      color: theme.textPrimary, fontSize: "12px",
+                      fontFamily: "'DM Sans', sans-serif",
+                    }}
+                  />
+                  <button
+                    onClick={() => {
+                      if (bulkTagInput.trim()) {
+                        const tags = bulkTagInput.split(",").map(t => t.trim().toLowerCase()).filter(t => t.length > 0);
+                        bulkAddTags(bulkSelected, tags);
+                        setBulkTagInput("");
+                      }
+                    }}
+                    disabled={!bulkTagInput.trim()}
+                    style={{
+                      background: bulkTagInput.trim() ? theme.accentGradient : theme.disabledBg,
+                      border: "none",
+                      color: bulkTagInput.trim() ? "#FAF7F2" : theme.disabledText,
+                      borderRadius: "8px", padding: "6px 12px", fontSize: "11px",
+                      fontFamily: "'DM Sans', sans-serif", fontWeight: 500,
+                      cursor: bulkTagInput.trim() ? "pointer" : "default",
+                    }}
+                  >Tag</button>
+                </div>
+
+                {/* Row 3: Bulk re-type — expandable section.
+                    Click "Change type" to reveal type buttons. Clicking a type
+                    changes every selected item to that type and exits bulk mode. */}
+                <div>
+                  <button
+                    onClick={() => setBulkRetypeOpen(prev => !prev)}
+                    style={{
+                      background: "none", border: "none", cursor: "pointer",
+                      color: theme.textMuted, fontSize: "11px",
+                      fontFamily: "'DM Sans', sans-serif",
+                      padding: "2px 0", display: "flex", alignItems: "center", gap: "4px",
+                    }}
+                  >
+                    <span style={{
+                      fontSize: "9px", transition: "transform 0.2s ease",
+                      transform: bulkRetypeOpen ? "rotate(90deg)" : "rotate(0deg)",
+                      display: "inline-block",
+                    }}>&#9656;</span>
+                    Change type
+                  </button>
+                  {bulkRetypeOpen && (
+                    <div style={{
+                      display: "flex", gap: "4px", flexWrap: "wrap",
+                      marginTop: "6px", animation: "softFadeIn 0.15s ease",
+                    }}>
+                      {Object.keys(typeLabels).map(type => {
+                        const typeColor = TYPE_COLORS[type] || theme.textMuted;
+                        return (
+                          <button key={type}
+                            onClick={() => { bulkRetype(bulkSelected, type); setBulkRetypeOpen(false); }}
+                            style={{
+                              background: `${typeColor}15`,
+                              border: `1px solid ${typeColor}33`,
+                              color: typeColor,
+                              borderRadius: "14px", padding: "3px 10px", fontSize: "11px",
+                              fontFamily: "'DM Sans', sans-serif", cursor: "pointer",
+                              transition: "all 0.15s ease",
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = `${typeColor}30`; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = `${typeColor}15`; }}
+                          >{typeLabels[type].label}</button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
