@@ -1097,7 +1097,7 @@ const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, ite
           <div style={{
             fontFamily: "'DM Sans', sans-serif", fontSize: "14.5px",
             color: theme.textPrimary, fontWeight: 500, marginBottom: "3px",
-          }}>Email digest</div>
+          }}>Email Digest</div>
           <div style={{
             fontFamily: "'Lora', serif", fontSize: "12.5px",
             color: theme.textFaint, fontStyle: "italic", marginBottom: "16px",
@@ -2169,6 +2169,10 @@ function Stash() {
       // Fetch all stashes from the server
       const data = await apiFetch("/api/stashes");
       setItems(data.stashes);
+
+      // Also load digest preferences so the Settings panel
+      // shows saved choices instead of defaults
+      loadDigestSettings();
     } catch (err) {
       console.error("[Auth] Failed to load stashes:", err.message);
       setAuthError("Logged in, but couldn't load your stashes. Please refresh to try again.");
