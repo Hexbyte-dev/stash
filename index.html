@@ -1543,7 +1543,7 @@ const ReminderPicker = ({ onPick, onClose, theme }) => {
                 if (isNaN(parsed.getTime())) return; // guard against invalid date
                 onPick(parsed.toISOString());
               }
-            }
+            }}
             disabled={!customDate || !customTime}
             style={{
               background: (customDate && customTime) ? theme.accentGradient : theme.disabledBg,
