@@ -4417,7 +4417,14 @@ function Stash() {
           if (data?.items && Array.isArray(data.items)) {
             // Fix #19: Validate each imported item has required fields
             // so corrupt or malicious data doesn't break the app
-            const validItem = (item) => item && typeof item.id === 'string' && typeof item.content === 'string';
+            const validItem = (item) =>
+              item &&
+              typeof item.id === 'string' &&
+              typeof item.content === 'string' &&
+              item.content.length <= 50000 &&
+              (!item.type || typeof item.type === 'string') &&
+              (!item.tags || (Array.isArray(item.tags) && item.tags.every(t => typeof t === 'string'))) &&
+              (!item.image || (typeof item.image === 'string' && item.image.length <= 7 * 1024 * 1024));
             const validItems = data.items.filter(validItem);
             if (validItems.length < data.items.length) {
               console.warn(`[Import] Skipped ${data.items.length - validItems.length} invalid items`);
