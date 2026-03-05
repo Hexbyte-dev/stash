@@ -1,7 +1,7 @@
 {
   "name": "Stash – Your Memory Bank",
   "short_name": "Stash",
-  "description": "Capture and organize the things worth holding onto",
+  "description": "Capture and organize the things worth holding on to",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

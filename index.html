@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Stash" />
-  <meta name="description" content="Capture and organize the things worth holding onto" />
+  <meta name="description" content="Capture and organize the things worth holding on to" />
   <title>Stash</title>
   <link rel="manifest" href="/manifest.json" />
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
@@ -410,6 +410,32 @@ const typeLabels = {
   media:   { icon: "♪", label: "Media" },
   event:   { icon: "☆", label: "Event" },
   recommended: { icon: "★", label: "Recommended" },
+};
+
+// ============================================================
+// TYPE BORDER COLORS
+//
+// Each stash type gets a unique accent color for its left border
+// and tinted pill backgrounds. These are earthy, muted tones
+// that complement the warm Stash palette without being too loud.
+// Some related types share colors (e.g., contact & person).
+// ============================================================
+const TYPE_COLORS = {
+  note: "#8B9E6B",      // sage green
+  link: "#5B8FA8",      // ocean blue
+  contact: "#C4956A",   // warm copper
+  reading: "#7B6B8A",   // muted purple
+  food: "#D4915E",      // terracotta
+  idea: "#C9A84C",      // golden
+  person: "#C4956A",    // warm copper (same as contact)
+  photo: "#5BA88F",     // teal green
+  travel: "#5B8FA8",    // ocean blue (same as link)
+  work: "#8B7355",      // brown
+  money: "#6B8E5B",     // forest green
+  health: "#A8555B",    // dusty rose
+  media: "#7B6B8A",     // muted purple (same as reading)
+  event: "#C9A84C",     // golden (same as idea)
+  recommended: "#5BA88F", // teal green (same as photo)
 };
 
 // ============================================================
@@ -1454,13 +1480,17 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
       padding: "16px 18px",
       marginBottom: "8px",
       border: `1px solid ${isSelected ? theme.accent + "66" : (isEditing ? theme.borderHover : (item.pinned ? theme.checkColor + "44" : theme.border))}`,
-      transition: "all 0.35s ease",
+      /* Smooth transitions for hover effects (shadow lift + color shifts) */
+      transition: "box-shadow 0.2s ease, transform 0.2s ease, border-color 0.35s ease, background 0.35s ease",
       cursor: bulkMode ? "pointer" : "default",
       animation: isSlidingOut ? "slideOut 0.3s ease forwards" : "cardIn 0.4s ease forwards",
       position: "relative",
       opacity: isCompleted && !isSlidingOut ? 0.6 : 1,
       boxShadow: isEditing ? theme.shadowHover : (isCompleted ? "none" : theme.shadowLight),
-      borderLeft: item.pinned && !isSelected ? `3px solid ${theme.checkColor}66` : undefined,
+      /* Color-coded left border: pinned items use green, others use their type color */
+      borderLeft: item.pinned && !isSelected
+        ? `4px solid ${theme.checkColor}66`
+        : `4px solid ${TYPE_COLORS[item.type] || '#C4B5A5'}`,
     }}
     onMouseEnter={e => {
       if (!isCompleted && !isEditing && !bulkMode) {
@@ -1526,10 +1556,12 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Type pill + time */}
           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+            {/* Type pill — uses the TYPE_COLORS map for a tinted background (15% opacity)
+                so each type has a distinctive but subtle color identity on the card */}
             <span style={{
               fontSize: "11px",
-              color: typeColors.color,
-              background: typeColors.bg,
+              color: TYPE_COLORS[item.type] || typeColors.color,
+              background: `${TYPE_COLORS[item.type] || typeColors.color}22`,
               padding: "4px 12px",
               borderRadius: "24px",
               fontFamily: "'DM Sans', sans-serif",
@@ -2931,26 +2963,33 @@ function Stash() {
         onSaveDigestSettings={saveDigestSettings}
       />
 
-      {/* ===== MAIN CONTENT ===== */}
+      {/* ===== MAIN CONTENT — 720px max gives cards more breathing room on desktop ===== */}
       <div style={{
-        maxWidth: "580px", margin: "0 auto", padding: "40px 20px",
+        maxWidth: "720px", margin: "0 auto", padding: "40px 20px",
         animation: "softFadeIn 0.6s ease",
       }}>
-        {/* Header */}
+        {/* Header — slightly larger title with letter-spacing for a "branded" feel,
+            plus a subtle bottom border gradient to separate header from content */}
         <header style={{
           marginBottom: "36px",
           display: "flex", alignItems: "baseline", justifyContent: "space-between",
+          paddingBottom: "20px",
+          borderBottom: `1px solid ${theme.border}`,
+          backgroundImage: theme.pageBg === "#1C1A17"
+            ? "none"
+            : "linear-gradient(180deg, rgba(250,247,242,0) 60%, rgba(237,232,224,0.3) 100%)",
         }}>
           <div>
             <h1 style={{
-              fontFamily: "'Lora', serif", fontSize: "32px", fontWeight: 400,
-              margin: "0 0 2px", color: theme.textSecondary,
-              letterSpacing: "-0.02em",
+              fontFamily: "'Lora', serif", fontSize: "36px", fontWeight: 400,
+              margin: "0 0 4px", color: theme.textSecondary,
+              letterSpacing: "0.04em",
             }}>Stash</h1>
             <p style={{
               fontFamily: "'Lora', serif", fontSize: "13.5px",
               color: theme.textGhost, margin: 0, fontStyle: "italic",
-            }}>the things worth holding onto</p>
+              opacity: 0.85,
+            }}>the things worth holding on to</p>
           </div>
           <button
             onClick={() => setSettingsOpen(true)}
@@ -2972,12 +3011,14 @@ function Stash() {
           >Settings</button>
         </header>
 
-        {/* Capture input */}
+        {/* Capture input — slight elevation + warm tint makes it feel "lifted" from the page */}
         <div style={{
-          background: theme.inputBg, borderRadius: "16px",
+          background: theme.pageBg === "#1C1A17" ? theme.inputBg : "#FFFDF9",
+          borderRadius: "16px",
           border: `1px solid ${pendingImage ? theme.borderHover : theme.border}`,
           padding: "4px", marginBottom: "28px",
-          transition: "all 0.35s ease", boxShadow: theme.shadowMedium,
+          transition: "all 0.35s ease",
+          boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
         }}>
           {pendingImage && (
             <div style={{ margin: "14px 14px 6px", position: "relative", display: "inline-block" }}>
@@ -3071,20 +3112,23 @@ function Stash() {
                 const info = getTypeInfo(type, settings.customCategories);
                 const colors = getTypeColors(type, theme, settings.customCategories);
                 const isActive = selectedType === type;
+                /* Selected pill gets a SOLID type color background with white text,
+                   making the active choice visually obvious. Unselected pills stay muted. */
+                const typeColor = TYPE_COLORS[type] || colors.color;
                 return (
                   <button
                     key={type}
                     onClick={() => setSelectedType(isActive ? "auto" : type)}
                     style={{
-                      background: isActive ? colors.bg : "transparent",
-                      border: isActive ? `1px solid ${colors.color}44` : "1px solid transparent",
-                      color: isActive ? colors.color : theme.textGhost,
+                      background: isActive ? typeColor : "transparent",
+                      border: isActive ? `1px solid ${typeColor}` : "1px solid transparent",
+                      color: isActive ? "#FFFFFF" : theme.textGhost,
                       borderRadius: "20px", padding: "5px 14px", fontSize: "12px",
                       fontFamily: "'DM Sans', sans-serif", cursor: "pointer",
                       transition: "all 0.2s ease",
                       whiteSpace: "nowrap", flexShrink: 0,
                     }}
-                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.color = colors.color; }}
+                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.color = typeColor; }}
                     onMouseLeave={e => { if (!isActive) e.currentTarget.style.color = theme.textGhost; }}
                   >{info.label}</button>
                 );
@@ -3145,28 +3189,31 @@ function Stash() {
                 }}>×</button>
               )}
             </div>
+            {/* Filter bar — rounded pills with subtle borders when inactive,
+                and colored backgrounds when active. Makes the filters feel clickable. */}
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
               <button onClick={() => setFilterType("all")} aria-pressed={filterType === "all"} style={{
                 background: filterType === "all" ? theme.cardBg : "transparent",
-                border: filterType === "all" ? `1px solid ${theme.border}` : "1px solid transparent",
+                border: filterType === "all" ? `1px solid ${theme.border}` : `1px solid ${theme.border}88`,
                 boxShadow: filterType === "all" ? theme.shadowLight : "none",
                 color: filterType === "all" ? theme.textSecondary : theme.textGhost,
-                borderRadius: "20px", padding: "4px 12px", fontSize: "12px",
+                borderRadius: "20px", padding: "6px 14px", fontSize: "12px",
                 fontFamily: "'DM Sans', sans-serif", cursor: "pointer", transition: "all 0.25s ease",
               }}>All {items.filter(i => settings.showCompleted || !i.completed).length}</button>
               {Object.entries(typeCounts).map(([type, count]) => {
                 const colors = getTypeColors(type, theme, settings.customCategories);
                 const labels = getTypeInfo(type, settings.customCategories);
                 const isActive = filterType === type;
+                const typeColor = TYPE_COLORS[type] || colors.color;
                 return (
                   <button key={type}
                     onClick={() => setFilterType(isActive ? "all" : type)}
                     aria-pressed={isActive}
                     style={{
-                      background: isActive ? colors.bg : "transparent",
-                      border: isActive ? `1px solid ${colors.color}33` : "1px solid transparent",
-                      color: isActive ? colors.color : theme.textGhost,
-                      borderRadius: "20px", padding: "4px 12px", fontSize: "12px",
+                      background: isActive ? `${typeColor}22` : "transparent",
+                      border: isActive ? `1px solid ${typeColor}55` : `1px solid ${theme.border}88`,
+                      color: isActive ? typeColor : theme.textGhost,
+                      borderRadius: "20px", padding: "6px 14px", fontSize: "12px",
                       fontFamily: "'DM Sans', sans-serif", cursor: "pointer", transition: "all 0.25s ease",
                     }}
                   >{labels.label} {count}</button>
@@ -3297,19 +3344,32 @@ function Stash() {
                 <div>
                   {groupItemsByDate(activeFiltered).map(group => (
                     <div key={group.label}>
+                      {/* Date group header — label left-aligned with a line extending right.
+                          Uses flexbox + a pseudo-line (1px div) to create the effect.
+                          Extra top margin separates groups visually. */}
                       <div style={{
+                        display: "flex", alignItems: "center", gap: "12px",
                         padding: "4px 4px 8px",
-                        fontFamily: "'DM Sans', sans-serif",
-                        fontSize: "11.5px", fontWeight: 500,
-                        color: theme.textGhost,
-                        letterSpacing: "0.5px",
-                        textTransform: "uppercase",
-                        marginTop: "16px",
+                        marginTop: "24px",
                       }}>
-                        {group.label}
-                        <span style={{ marginLeft: "6px", fontWeight: 400, opacity: 0.6 }}>
-                          · {group.items.length}
+                        <span style={{
+                          fontFamily: "'DM Sans', sans-serif",
+                          fontSize: "11.5px", fontWeight: 500,
+                          color: theme.textGhost,
+                          letterSpacing: "0.5px",
+                          textTransform: "uppercase",
+                          whiteSpace: "nowrap",
+                        }}>
+                          {group.label}
+                          <span style={{ marginLeft: "6px", fontWeight: 400, opacity: 0.6 }}>
+                            · {group.items.length}
+                          </span>
                         </span>
+                        {/* Horizontal line that fills remaining space */}
+                        <div style={{
+                          flex: 1, height: "1px",
+                          background: theme.border,
+                        }} />
                       </div>
                       {group.items.map(item => (
                         <StashCard
