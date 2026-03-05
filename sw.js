@@ -17,7 +17,7 @@
 // "activate" handler deletes all old caches, forcing the browser
 // to fetch fresh files from the server. Without this, the PWA
 // keeps serving stale cached files indefinitely.
-const CACHE_NAME = "stash-v3";
+const CACHE_NAME = "stash-v4";
 
 // Core files to cache immediately on install
 // Fix #1: Pinned to exact versions to match index.html (prevents version drift)
