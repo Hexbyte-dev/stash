@@ -154,6 +154,41 @@ const timezoneOptions = [
   { value: "UTC",                 label: "UTC" },
 ];
 
+// ============================================================
+// DIGEST SETTING CONSTANTS
+// These live outside components so they're created once and
+// shared by any component that needs them (avoids recreating
+// arrays on every render).
+// ============================================================
+
+// Curated timezone list for digest settings
+// Only major zones to keep the dropdown manageable
+const DIGEST_TIMEZONES = [
+  { value: "America/New_York", label: "Eastern (New York)" },
+  { value: "America/Chicago", label: "Central (Chicago)" },
+  { value: "America/Denver", label: "Mountain (Denver)" },
+  { value: "America/Los_Angeles", label: "Pacific (Los Angeles)" },
+  { value: "America/Anchorage", label: "Alaska" },
+  { value: "Pacific/Honolulu", label: "Hawaii" },
+  { value: "Europe/London", label: "London" },
+  { value: "Europe/Paris", label: "Paris / Berlin" },
+  { value: "Asia/Dubai", label: "Dubai" },
+  { value: "Asia/Kolkata", label: "Mumbai" },
+  { value: "Asia/Singapore", label: "Singapore" },
+  { value: "Asia/Tokyo", label: "Tokyo" },
+  { value: "Australia/Sydney", label: "Sydney" },
+  { value: "Pacific/Auckland", label: "Auckland" },
+];
+
+// Hourly time slots from 6 AM to 10 PM for digest send time
+// We use a for loop to build this array programmatically instead
+// of typing out 17 entries by hand — less error-prone!
+const DIGEST_TIMES = [];
+for (let h = 6; h <= 22; h++) {
+  // padStart(2, "0") turns 6 → "06", 10 → "10", etc.
+  DIGEST_TIMES.push(String(h).padStart(2, "0") + ":00");
+}
+
 const formatDateTime = (dateString, timezone = "America/New_York") => {
   const date = new Date(dateString);
   
@@ -726,7 +761,7 @@ const CustomCategoryForm = ({ onAdd, theme }) => {
   );
 };
 
-const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, itemCount, completedCount, onExport, onExportFull, onImport, onLogout }) => {
+const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, itemCount, completedCount, onExport, onExportFull, onImport, onLogout, onSaveDigestSettings }) => {
   if (!isOpen) return null;
 
   return (
@@ -1043,6 +1078,145 @@ const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, ite
               color: theme.textFaint, fontStyle: "italic",
             }}>completed</div>
           </div>
+        </div>
+
+        {/* ============================================================
+            EMAIL DIGEST — controls daily/weekly summary emails
+
+            This section lets you choose how often (or if) the server
+            sends you a summary email of your recent stashes. The
+            settings are saved to the server (not localStorage) because
+            the digest worker service reads them to decide when to
+            send your emails.
+            ============================================================ */}
+        <div style={{
+          padding: "16px 0",
+          borderTop: `1px solid ${theme.border}`,
+          marginTop: "16px",
+        }}>
+          <div style={{
+            fontFamily: "'DM Sans', sans-serif", fontSize: "14.5px",
+            color: theme.textPrimary, fontWeight: 500, marginBottom: "3px",
+          }}>Email digest</div>
+          <div style={{
+            fontFamily: "'Lora', serif", fontSize: "12.5px",
+            color: theme.textFaint, fontStyle: "italic", marginBottom: "16px",
+          }}>Get a summary of your recent stashes by email</div>
+
+          {/* Frequency radio buttons — "radio" inputs let the user pick
+              exactly ONE option from a group (unlike checkboxes which
+              allow multiple). All radios with the same "name" attribute
+              are automatically grouped together by the browser. */}
+          <div style={{ marginBottom: "16px" }}>
+            <div style={{
+              fontFamily: "'DM Sans', sans-serif", fontSize: "12.5px",
+              color: theme.textMuted, marginBottom: "8px",
+            }}>Frequency</div>
+            {[
+              { value: "daily", label: "Daily" },
+              { value: "weekly", label: "Weekly" },
+              { value: "none", label: "Off" },
+            ].map(opt => (
+              <label key={opt.value} style={{
+                display: "inline-flex", alignItems: "center",
+                marginRight: "16px", cursor: "pointer",
+                fontSize: "13px", fontFamily: "'DM Sans', sans-serif",
+                color: theme.textSecondary,
+              }}>
+                <input
+                  type="radio"
+                  name="digestFrequency"
+                  value={opt.value}
+                  checked={settings.digestFrequency === opt.value}
+                  onChange={() => {
+                    // Update local state immediately (for instant UI feedback)
+                    onUpdateSettings({ ...settings, digestFrequency: opt.value });
+                    // Also save to server (for the digest worker to read)
+                    onSaveDigestSettings({ digest_frequency: opt.value });
+                  }}
+                  style={{ marginRight: "6px" }}
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+
+          {/* Send time & timezone dropdowns — only show when digest is enabled.
+              This is "conditional rendering": the && operator means
+              "if the left side is true, render the right side." */}
+          {settings.digestFrequency !== "none" && (
+            <>
+              <div style={{ marginBottom: "16px" }}>
+                <div style={{
+                  fontFamily: "'DM Sans', sans-serif", fontSize: "12.5px",
+                  color: theme.textMuted, marginBottom: "8px",
+                }}>Send at</div>
+                <select
+                  value={settings.digestTime}
+                  onChange={(e) => {
+                    onUpdateSettings({ ...settings, digestTime: e.target.value });
+                    onSaveDigestSettings({ digest_time: e.target.value });
+                  }}
+                  style={{
+                    background: theme.hoverBg,
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: "10px",
+                    padding: "7px 12px",
+                    color: theme.textSecondary,
+                    fontSize: "13px",
+                    fontFamily: "'DM Sans', sans-serif",
+                    cursor: "pointer",
+                    appearance: "none",
+                    WebkitAppearance: "none",
+                    width: "100%",
+                    maxWidth: "200px",
+                  }}
+                >
+                  {DIGEST_TIMES.map(t => (
+                    <option key={t} value={t}>
+                      {/* Convert 24h to 12h for friendlier display: "08:00" → "8:00 AM" */}
+                      {parseInt(t) === 0 ? "12:00 AM"
+                        : parseInt(t) < 12 ? `${parseInt(t)}:00 AM`
+                        : parseInt(t) === 12 ? "12:00 PM"
+                        : `${parseInt(t) - 12}:00 PM`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: "4px" }}>
+                <div style={{
+                  fontFamily: "'DM Sans', sans-serif", fontSize: "12.5px",
+                  color: theme.textMuted, marginBottom: "8px",
+                }}>Timezone</div>
+                <select
+                  value={settings.digestTimezone}
+                  onChange={(e) => {
+                    onUpdateSettings({ ...settings, digestTimezone: e.target.value });
+                    onSaveDigestSettings({ timezone: e.target.value });
+                  }}
+                  style={{
+                    background: theme.hoverBg,
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: "10px",
+                    padding: "7px 12px",
+                    color: theme.textSecondary,
+                    fontSize: "13px",
+                    fontFamily: "'DM Sans', sans-serif",
+                    cursor: "pointer",
+                    appearance: "none",
+                    WebkitAppearance: "none",
+                    width: "100%",
+                    maxWidth: "280px",
+                  }}
+                >
+                  {DIGEST_TIMEZONES.map(tz => (
+                    <option key={tz.value} value={tz.value}>{tz.label}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Export */}
@@ -2011,6 +2185,52 @@ function Stash() {
     setItems([]);
   };
 
+  // ============================================================
+  // DIGEST SETTINGS — server-synced preferences
+  //
+  // These two functions talk to the backend settings API.
+  // Unlike other settings (darkMode, etc.) which live only in
+  // localStorage, digest preferences MUST be on the server
+  // because the digest worker (a separate service) reads them
+  // to know when and how to send your email summaries.
+  // ============================================================
+
+  // Load the user's digest preferences from the server.
+  // Called when user logs in, so the Settings panel shows
+  // their saved choices instead of defaults.
+  const loadDigestSettings = async () => {
+    try {
+      const data = await apiFetch("/api/settings");
+      if (data.success) {
+        // Merge server values into local state — the spread (...prev)
+        // keeps all other settings intact while updating just these three.
+        setSettings(prev => ({
+          ...prev,
+          digestFrequency: data.settings.digest_frequency,
+          digestTime: data.settings.digest_time,
+          digestTimezone: data.settings.timezone,
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to load digest settings:", err.message);
+    }
+  };
+
+  // Save a digest setting change to the server.
+  // `changes` is an object like { digest_frequency: "weekly" }.
+  // We send only the changed fields — the server's COALESCE
+  // logic keeps the other fields unchanged.
+  const saveDigestSettings = async (changes) => {
+    try {
+      await apiFetch("/api/settings", {
+        method: "PUT",
+        body: JSON.stringify(changes),
+      });
+    } catch (err) {
+      console.error("Failed to save digest settings:", err.message);
+    }
+  };
+
   const [items, setItems] = useState([]);
   const [inputValue, setInputValue] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -2037,6 +2257,11 @@ function Stash() {
     showCompleted: true,
     timezone: "America/New_York",
     customCategories: [],  // NEW: user-created categories [{id, label, icon, keywords: [], colorIndex}]
+    // Email digest preferences — synced with the server so the
+    // digest worker knows when/how to send summary emails.
+    digestFrequency: "daily",
+    digestTime: "08:00",
+    digestTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York",
   });
   const inputRef = useRef(null);
   const dragCounterRef = useRef(0);
@@ -2064,6 +2289,9 @@ function Stash() {
         try {
           const data = await apiFetch("/api/stashes");
           setItems(data.stashes);
+          // Also load digest preferences from the server so the
+          // Settings panel shows the user's saved choices
+          loadDigestSettings();
           setAuthLoading(false);
           setIsLoading(false);
         } catch (err) {
@@ -2678,6 +2906,7 @@ function Stash() {
           }
         }}
         onLogout={handleLogout}
+        onSaveDigestSettings={saveDigestSettings}
       />
 
       {/* ===== MAIN CONTENT ===== */}
