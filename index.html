@@ -2320,6 +2320,7 @@ function Stash() {
     digestTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York",
   });
   const inputRef = useRef(null);
+  const searchRef = useRef(null);   // Ref for the search input — lets us focus it via keyboard shortcuts
   const dragCounterRef = useRef(0);
   // Fix #9: Store items in a ref so the auto-archive effect can read
   // current items without re-triggering itself (avoids infinite loop)
@@ -2327,6 +2328,62 @@ function Stash() {
 
   // Fix #9: Keep the ref in sync whenever items change
   useEffect(() => { itemsRef.current = items; }, [items]);
+
+  // ── Keyboard shortcuts ──────────────────────────────────────
+  // useEffect with a "keydown" listener on `document` lets us catch
+  // keyboard events globally — no matter which element is focused.
+  // The cleanup function (returned arrow fn) removes the listener
+  // when the component unmounts, preventing memory leaks.
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      // ── Ctrl+K / Cmd+K  →  Focus search bar ──
+      // e.metaKey is true on Mac (⌘), e.ctrlKey on Windows/Linux
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();   // stop browser from opening its own search/address bar
+        searchRef.current?.focus();
+        return;
+      }
+
+      // ── Ctrl+N / Cmd+N  →  Focus compose input ──
+      if ((e.metaKey || e.ctrlKey) && e.key === "n") {
+        e.preventDefault();   // stop browser from opening a new window
+        inputRef.current?.focus();
+        return;
+      }
+
+      // ── Escape  →  Close things in priority order ──
+      // We only close ONE thing per press so the user can "peel back"
+      // layers one at a time (image viewer → settings → search).
+      // Note: ImageViewer and SettingsPanel already have their own
+      // Escape handlers, but those only work when those elements have
+      // focus. This global handler catches Escape from anywhere.
+      if (e.key === "Escape") {
+        if (viewingImage)       { setViewingImage(null);  return; }
+        if (settingsOpen)       { setSettingsOpen(false);  return; }
+        if (searchQuery)        { setSearchQuery("");      return; }
+        return;
+      }
+
+      // ── /  →  Quick-focus search (GitHub / YouTube style) ──
+      // Only fires when the user is NOT already typing in an input,
+      // textarea, or contenteditable element — otherwise pressing "/"
+      // while composing a stash would steal focus.
+      if (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const tag = e.target.tagName;
+        const isEditable = tag === "INPUT" || tag === "TEXTAREA" || e.target.isContentEditable;
+        if (!isEditable) {
+          e.preventDefault();  // prevent "/" from being typed into the search bar
+          searchRef.current?.focus();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleGlobalKeyDown);
+    // Cleanup: remove the listener when the component unmounts
+    return () => document.removeEventListener("keydown", handleGlobalKeyDown);
+  // The dependency array lists every piece of state the handler reads.
+  // When any of these change, React re-creates the listener with fresh values.
+  }, [viewingImage, settingsOpen, searchQuery]);
 
   // Current theme based on settings
   const theme = settings.darkMode ? themes.dark : themes.light;
@@ -3174,6 +3231,7 @@ function Stash() {
             }}>
               <span style={{ color: theme.textGhost, fontSize: "14px", fontFamily: "'DM Sans', sans-serif" }}>⌕</span>
               <input
+                ref={searchRef}
                 type="text" value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search your memories…"
@@ -3189,6 +3247,23 @@ function Stash() {
                   background: "none", border: "none",
                   color: theme.textFaint, cursor: "pointer", fontSize: "14px", padding: "2px 6px",
                 }}>×</button>
+              )}
+              {/* Keyboard shortcut hint — a small muted pill like GitHub/Slack
+                  shows so power users discover the shortcut. Hidden when
+                  there's an active query to avoid visual clutter. */}
+              {!searchQuery && (
+                <span style={{
+                  fontSize: "10px", fontFamily: "'DM Sans', sans-serif",
+                  color: theme.textGhost, background: theme.border + "44",
+                  border: `1px solid ${theme.border}`,
+                  borderRadius: "4px", padding: "2px 6px",
+                  whiteSpace: "nowrap", userSelect: "none",
+                  lineHeight: "1.4",
+                }}>
+                  {/* navigator.platform is deprecated but still the simplest
+                      way to detect Mac for cosmetic UI hints */}
+                  {navigator.platform?.includes("Mac") ? "⌘K" : "Ctrl+K"}
+                </span>
               )}
             </div>
             {/* Filter bar — rounded pills with subtle borders when inactive,
