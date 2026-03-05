@@ -806,6 +806,75 @@ const CustomCategoryForm = ({ onAdd, theme }) => {
 };
 
 const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, itemCount, completedCount, onExport, onExportFull, onImport, onLogout, onSaveDigestSettings }) => {
+  // Change Password state
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwError, setPwError] = useState("");
+  const [pwSuccess, setPwSuccess] = useState("");
+
+  // Delete Account state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPwError("");
+    setPwSuccess("");
+
+    // Client-side validation
+    if (newPassword.length < 8) {
+      setPwError("New password must be at least 8 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwError("New passwords do not match");
+      return;
+    }
+
+    setPwLoading(true);
+    try {
+      const data = await apiFetch("/api/auth/change-password", {
+        method: "POST",
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      // Update stored token with the fresh one from response
+      if (data.token) {
+        localStorage.setItem("stash-token", data.token);
+      }
+      setPwSuccess("Password changed successfully");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setTimeout(() => setPwSuccess(""), 3000);
+    } catch (err) {
+      setPwError(err.message);
+    } finally {
+      setPwLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleteError("");
+    setDeleteLoading(true);
+    try {
+      await apiFetch("/api/auth/account", {
+        method: "DELETE",
+        body: JSON.stringify({ password: deletePassword }),
+      });
+      // Clear everything and redirect to login
+      localStorage.removeItem("stash-token");
+      if (onLogout) onLogout();
+    } catch (err) {
+      setDeleteError(err.message);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -1351,6 +1420,178 @@ const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, ite
             />
           </label>
         </div>
+        {/* Change Password */}
+        <div style={{
+          padding: "16px 0 4px",
+          borderTop: `1px solid ${theme.border}`,
+          marginTop: "16px",
+        }}>
+          <div style={{
+            fontFamily: "'DM Sans', sans-serif", fontSize: "14.5px",
+            color: theme.textPrimary, fontWeight: 500, marginBottom: "3px",
+          }}>Change password</div>
+          <div style={{
+            fontFamily: "'Lora', serif", fontSize: "12.5px",
+            color: theme.textFaint, fontStyle: "italic", marginBottom: "14px",
+          }}>Update your account password</div>
+          <form onSubmit={handleChangePassword}>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={e => { setCurrentPassword(e.target.value); setPwError(""); }}
+              placeholder="Current password"
+              required
+              autoComplete="current-password"
+              style={{
+                width: "100%", padding: "10px 12px", borderRadius: "10px",
+                border: `1px solid ${theme.border}`, background: theme.inputBg,
+                color: theme.textPrimary, fontFamily: "'DM Sans', sans-serif",
+                fontSize: "13px", outline: "none", boxSizing: "border-box",
+                marginBottom: "8px",
+              }}
+            />
+            <input
+              type="password"
+              value={newPassword}
+              onChange={e => { setNewPassword(e.target.value); setPwError(""); }}
+              placeholder="New password (8+ characters)"
+              required
+              autoComplete="new-password"
+              style={{
+                width: "100%", padding: "10px 12px", borderRadius: "10px",
+                border: `1px solid ${theme.border}`, background: theme.inputBg,
+                color: theme.textPrimary, fontFamily: "'DM Sans', sans-serif",
+                fontSize: "13px", outline: "none", boxSizing: "border-box",
+                marginBottom: "8px",
+              }}
+            />
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={e => { setConfirmPassword(e.target.value); setPwError(""); }}
+              placeholder="Confirm new password"
+              required
+              autoComplete="new-password"
+              style={{
+                width: "100%", padding: "10px 12px", borderRadius: "10px",
+                border: `1px solid ${theme.border}`, background: theme.inputBg,
+                color: theme.textPrimary, fontFamily: "'DM Sans', sans-serif",
+                fontSize: "13px", outline: "none", boxSizing: "border-box",
+                marginBottom: "10px",
+              }}
+            />
+            {pwError && (
+              <div style={{
+                color: theme.deleteColor, fontSize: "12.5px",
+                fontFamily: "'DM Sans', sans-serif", marginBottom: "8px",
+              }}>{pwError}</div>
+            )}
+            {pwSuccess && (
+              <div style={{
+                color: theme.checkColor, fontSize: "12.5px",
+                fontFamily: "'DM Sans', sans-serif", marginBottom: "8px",
+              }}>{pwSuccess}</div>
+            )}
+            <button
+              type="submit"
+              disabled={pwLoading}
+              style={{
+                background: pwLoading ? theme.disabledBg : theme.hoverBg,
+                border: `1px solid ${theme.border}`,
+                color: pwLoading ? theme.disabledText : theme.textSecondary,
+                borderRadius: "10px", padding: "8px 16px",
+                fontSize: "13px", fontFamily: "'DM Sans', sans-serif",
+                cursor: pwLoading ? "default" : "pointer",
+                transition: "all 0.2s ease",
+              }}
+            >{pwLoading ? "Changing..." : "Change password"}</button>
+          </form>
+        </div>
+
+        {/* Danger Zone — account deletion */}
+        <div style={{
+          padding: "16px",
+          borderTop: `1px solid ${theme.border}`,
+          marginTop: "20px",
+          border: `1px solid ${theme.deleteColor}`,
+          borderRadius: "14px",
+        }}>
+          <div style={{
+            fontFamily: "'DM Sans', sans-serif", fontSize: "14.5px",
+            color: theme.deleteColor, fontWeight: 500, marginBottom: "3px",
+          }}>Danger zone</div>
+          <div style={{
+            fontFamily: "'Lora', serif", fontSize: "12.5px",
+            color: theme.textFaint, fontStyle: "italic", marginBottom: "12px",
+          }}>Irreversible actions</div>
+
+          {!showDeleteConfirm ? (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              style={{
+                background: "none", border: `1px solid ${theme.deleteColor}`,
+                color: theme.deleteColor, borderRadius: "10px",
+                padding: "8px 16px", fontSize: "13px",
+                fontFamily: "'DM Sans', sans-serif",
+                cursor: "pointer", transition: "background 0.2s ease",
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = theme.deleteBg}
+              onMouseLeave={e => e.currentTarget.style.background = "none"}
+            >Delete account</button>
+          ) : (
+            <div>
+              <p style={{
+                fontFamily: "'DM Sans', sans-serif", fontSize: "13px",
+                color: theme.deleteColor, marginBottom: "12px", lineHeight: 1.5,
+              }}>This will permanently delete your account and all your stashes. This cannot be undone.</p>
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={e => { setDeletePassword(e.target.value); setDeleteError(""); }}
+                placeholder="Enter your password to confirm"
+                autoComplete="current-password"
+                style={{
+                  width: "100%", padding: "10px 12px", borderRadius: "10px",
+                  border: `1px solid ${theme.deleteColor}`, background: theme.inputBg,
+                  color: theme.textPrimary, fontFamily: "'DM Sans', sans-serif",
+                  fontSize: "13px", outline: "none", boxSizing: "border-box",
+                  marginBottom: "10px",
+                }}
+              />
+              {deleteError && (
+                <div style={{
+                  color: theme.deleteColor, fontSize: "12.5px",
+                  fontFamily: "'DM Sans', sans-serif", marginBottom: "8px",
+                }}>{deleteError}</div>
+              )}
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  onClick={() => { setShowDeleteConfirm(false); setDeletePassword(""); setDeleteError(""); }}
+                  style={{
+                    flex: 1, padding: "10px", borderRadius: "10px",
+                    border: `1px solid ${theme.border}`, background: "none",
+                    color: theme.textSecondary, fontFamily: "'DM Sans', sans-serif",
+                    fontSize: "13px", cursor: "pointer",
+                  }}
+                >Cancel</button>
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={!deletePassword || deleteLoading}
+                  style={{
+                    flex: 1, padding: "10px", borderRadius: "10px",
+                    border: "none",
+                    background: (!deletePassword || deleteLoading) ? theme.disabledBg : theme.deleteColor,
+                    color: (!deletePassword || deleteLoading) ? theme.disabledText : "#FFFFFF",
+                    fontFamily: "'DM Sans', sans-serif",
+                    fontSize: "13px", fontWeight: 500,
+                    cursor: (!deletePassword || deleteLoading) ? "default" : "pointer",
+                  }}
+                >{deleteLoading ? "Deleting..." : "Delete my account"}</button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Logout */}
         {onLogout && (
           <div style={{ marginTop: "28px", paddingTop: "20px", borderTop: `1px solid ${theme.border}` }}>
@@ -2583,6 +2824,88 @@ const LoginScreen = ({ onLogin, theme, initialError }) => {
   const [error, setError] = useState(initialError || "");
   const [loading, setLoading] = useState(false);
 
+  // Forgot Password state
+  // forgotStep: null = not in forgot flow, 1 = enter email, 2 = enter code + new password
+  const [forgotStep, setForgotStep] = useState(null);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotCode, setForgotCode] = useState("");
+  const [forgotNewPassword, setForgotNewPassword] = useState("");
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState("");
+
+  // Step 1: Request a reset code
+  const handleForgotSubmitEmail = async (e) => {
+    e.preventDefault();
+    setForgotError("");
+    setForgotLoading(true);
+    try {
+      await fetch(`${BACKEND_URL}/api/auth/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: forgotEmail }),
+      }).then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Something went wrong");
+      });
+      // Move to step 2 regardless (server won't reveal if email exists)
+      setForgotStep(2);
+    } catch (err) {
+      if (err instanceof TypeError) {
+        setForgotError("Unable to reach the server. Check your connection.");
+      } else {
+        setForgotError(err.message);
+      }
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  // Step 2: Submit code + new password
+  const handleForgotReset = async (e) => {
+    e.preventDefault();
+    setForgotError("");
+    if (forgotNewPassword.length < 8) {
+      setForgotError("Password must be at least 8 characters");
+      return;
+    }
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      setForgotError("Passwords do not match");
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/auth/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: forgotEmail, code: forgotCode, newPassword: forgotNewPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Something went wrong");
+      // Success — the response includes a token, so log them in
+      localStorage.setItem("stash-token", data.token);
+      onLogin(data.token, data.user);
+    } catch (err) {
+      if (err instanceof TypeError) {
+        setForgotError("Unable to reach the server. Check your connection.");
+      } else {
+        setForgotError(err.message);
+      }
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  // Reset the forgot flow and go back to login
+  const exitForgotFlow = () => {
+    setForgotStep(null);
+    setForgotEmail("");
+    setForgotCode("");
+    setForgotNewPassword("");
+    setForgotConfirmPassword("");
+    setForgotError("");
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -2628,6 +2951,172 @@ const LoginScreen = ({ onLogin, theme, initialError }) => {
     }
   };
 
+  // ---------- Forgot Password Flow ----------
+  if (forgotStep) {
+    return (
+      <div style={{
+        minHeight: "100vh", background: theme.pageBg,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontFamily: "'DM Sans', sans-serif", transition: "background 0.4s ease",
+      }}>
+        <div style={{ width: "92%", maxWidth: "380px", animation: "softFadeIn 0.6s ease" }}>
+          <div style={{ textAlign: "center", marginBottom: "36px" }}>
+            <h1 style={{
+              fontFamily: "'Lora', serif", fontSize: "36px", fontWeight: 400,
+              color: theme.textSecondary, letterSpacing: "-0.02em", margin: "0 0 6px",
+            }}>Stash</h1>
+            <p style={{
+              fontFamily: "'Lora', serif", fontSize: "14px",
+              color: theme.textGhost, fontStyle: "italic", margin: 0,
+            }}>reset your password</p>
+          </div>
+
+          <div style={{
+            background: theme.cardBg, borderRadius: "20px",
+            border: `1px solid ${theme.border}`, padding: "32px 28px",
+            boxShadow: theme.shadowMedium,
+          }}>
+            {forgotStep === 1 && (
+              <form onSubmit={handleForgotSubmitEmail}>
+                <p style={{
+                  fontFamily: "'DM Sans', sans-serif", fontSize: "13.5px",
+                  color: theme.textSecondary, marginBottom: "18px", lineHeight: 1.5,
+                }}>Enter your email to receive a reset code</p>
+                <input
+                  type="email"
+                  value={forgotEmail}
+                  onChange={e => { setForgotEmail(e.target.value); setForgotError(""); }}
+                  placeholder="you@example.com"
+                  required
+                  autoComplete="email"
+                  style={{
+                    width: "100%", padding: "12px 14px", borderRadius: "12px",
+                    border: `1px solid ${theme.border}`, background: theme.inputBg,
+                    color: theme.textPrimary, fontFamily: "'DM Sans', sans-serif",
+                    fontSize: "15px", outline: "none", boxSizing: "border-box",
+                    marginBottom: "18px",
+                  }}
+                />
+                {forgotError && (
+                  <div style={{
+                    color: theme.deleteColor, fontSize: "13px",
+                    fontFamily: "'DM Sans', sans-serif", marginBottom: "14px", textAlign: "center",
+                  }}>{forgotError}</div>
+                )}
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  style={{
+                    width: "100%", padding: "13px", borderRadius: "12px",
+                    border: "none",
+                    background: forgotLoading ? theme.disabledBg : theme.accentGradient,
+                    color: forgotLoading ? theme.disabledText : "#FFFFFF",
+                    fontFamily: "'DM Sans', sans-serif", fontSize: "15px", fontWeight: 500,
+                    cursor: forgotLoading ? "default" : "pointer",
+                  }}
+                >{forgotLoading ? "Sending..." : "Send reset code"}</button>
+              </form>
+            )}
+
+            {forgotStep === 2 && (
+              <form onSubmit={handleForgotReset}>
+                <p style={{
+                  fontFamily: "'DM Sans', sans-serif", fontSize: "13.5px",
+                  color: theme.textSecondary, marginBottom: "18px", lineHeight: 1.5,
+                }}>Enter the 6-digit code sent to your email</p>
+                <input
+                  type="text"
+                  value={forgotCode}
+                  onChange={e => { setForgotCode(e.target.value.replace(/\D/g, "").slice(0, 6)); setForgotError(""); }}
+                  placeholder="000000"
+                  maxLength={6}
+                  required
+                  style={{
+                    width: "100%", padding: "12px 14px", borderRadius: "12px",
+                    border: `1px solid ${theme.border}`, background: theme.inputBg,
+                    color: theme.textPrimary, fontFamily: "'DM Sans', sans-serif",
+                    fontSize: "20px", letterSpacing: "0.3em", textAlign: "center",
+                    outline: "none", boxSizing: "border-box", marginBottom: "14px",
+                  }}
+                />
+                <div style={{ marginBottom: "14px" }}>
+                  <label style={{
+                    display: "block", fontFamily: "'DM Sans', sans-serif",
+                    fontSize: "13px", fontWeight: 500, color: theme.textMuted, marginBottom: "6px",
+                  }}>New password</label>
+                  <input
+                    type="password"
+                    value={forgotNewPassword}
+                    onChange={e => { setForgotNewPassword(e.target.value); setForgotError(""); }}
+                    placeholder="8+ characters"
+                    required
+                    autoComplete="new-password"
+                    style={{
+                      width: "100%", padding: "12px 14px", borderRadius: "12px",
+                      border: `1px solid ${theme.border}`, background: theme.inputBg,
+                      color: theme.textPrimary, fontFamily: "'DM Sans', sans-serif",
+                      fontSize: "15px", outline: "none", boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+                <div style={{ marginBottom: "18px" }}>
+                  <label style={{
+                    display: "block", fontFamily: "'DM Sans', sans-serif",
+                    fontSize: "13px", fontWeight: 500, color: theme.textMuted, marginBottom: "6px",
+                  }}>Confirm new password</label>
+                  <input
+                    type="password"
+                    value={forgotConfirmPassword}
+                    onChange={e => { setForgotConfirmPassword(e.target.value); setForgotError(""); }}
+                    placeholder="Repeat password"
+                    required
+                    autoComplete="new-password"
+                    style={{
+                      width: "100%", padding: "12px 14px", borderRadius: "12px",
+                      border: `1px solid ${theme.border}`, background: theme.inputBg,
+                      color: theme.textPrimary, fontFamily: "'DM Sans', sans-serif",
+                      fontSize: "15px", outline: "none", boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+                {forgotError && (
+                  <div style={{
+                    color: theme.deleteColor, fontSize: "13px",
+                    fontFamily: "'DM Sans', sans-serif", marginBottom: "14px", textAlign: "center",
+                  }}>{forgotError}</div>
+                )}
+                <button
+                  type="submit"
+                  disabled={forgotLoading || forgotCode.length !== 6}
+                  style={{
+                    width: "100%", padding: "13px", borderRadius: "12px",
+                    border: "none",
+                    background: (forgotLoading || forgotCode.length !== 6) ? theme.disabledBg : theme.accentGradient,
+                    color: (forgotLoading || forgotCode.length !== 6) ? theme.disabledText : "#FFFFFF",
+                    fontFamily: "'DM Sans', sans-serif", fontSize: "15px", fontWeight: 500,
+                    cursor: (forgotLoading || forgotCode.length !== 6) ? "default" : "pointer",
+                  }}
+                >{forgotLoading ? "Resetting..." : "Reset password"}</button>
+              </form>
+            )}
+
+            <div style={{
+              textAlign: "center", marginTop: "20px",
+              fontSize: "13px", color: theme.textFaint,
+              fontFamily: "'DM Sans', sans-serif",
+            }}>
+              <span
+                onClick={exitForgotFlow}
+                style={{ color: theme.accent, cursor: "pointer", fontWeight: 500 }}
+              >Back to login</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------- Normal Login / Signup ----------
   return (
     <div style={{
       minHeight: "100vh",
@@ -2778,10 +3267,23 @@ const LoginScreen = ({ onLogin, theme, initialError }) => {
             </button>
           </form>
 
+          {/* Forgot password link — only in login mode */}
+          {authMode === "login" && (
+            <div style={{
+              textAlign: "center", marginTop: "14px",
+              fontSize: "13px", fontFamily: "'DM Sans', sans-serif",
+            }}>
+              <span
+                onClick={() => { setForgotStep(1); setForgotEmail(email); setError(""); }}
+                style={{ color: theme.textFaint, cursor: "pointer" }}
+              >Forgot password?</span>
+            </div>
+          )}
+
           {/* Toggle login/signup */}
           <div style={{
             textAlign: "center",
-            marginTop: "20px",
+            marginTop: authMode === "login" ? "10px" : "20px",
             fontSize: "13px",
             color: theme.textFaint,
             fontFamily: "'DM Sans', sans-serif",
@@ -2819,6 +3321,14 @@ function Stash() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(!!localStorage.getItem("stash-token"));
   const [authError, setAuthError] = useState("");
+  // Email verification — tracks whether the user has verified their email.
+  // Initialized from the user object returned by login/signup (which includes email_verified).
+  const [emailVerified, setEmailVerified] = useState(true);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [verifyCode, setVerifyCode] = useState("");
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [verifyError, setVerifyError] = useState("");
+  const [verifySuccess, setVerifySuccess] = useState("");
 
   // Listen for auth-expired events from apiFetch
   useEffect(() => {
@@ -2827,6 +3337,7 @@ function Stash() {
       setToken(null);
       setUser(null);
       setItems([]);
+      setEmailVerified(true);
       setAuthError("Session expired. Please log in again.");
     };
     window.addEventListener("auth-expired", handleAuthExpired);
@@ -2839,6 +3350,10 @@ function Stash() {
     setUser(userData);
     setAuthError("");
     setAuthLoading(true);
+    // Track email verification status from the user object
+    if (userData && userData.email_verified !== undefined) {
+      setEmailVerified(userData.email_verified);
+    }
 
     try {
       // Check for localStorage stashes to migrate
@@ -2887,6 +3402,43 @@ function Stash() {
     setToken(null);
     setUser(null);
     setItems([]);
+    setEmailVerified(true);
+  };
+
+  // Send a verification code to the user's email
+  const sendVerificationCode = async () => {
+    setVerifyLoading(true);
+    setVerifyError("");
+    try {
+      await apiFetch("/api/auth/send-verification", { method: "POST" });
+      setShowVerifyModal(true);
+    } catch (err) {
+      setVerifyError(err.message);
+    } finally {
+      setVerifyLoading(false);
+    }
+  };
+
+  // Submit the 6-digit verification code
+  const submitVerificationCode = async () => {
+    setVerifyLoading(true);
+    setVerifyError("");
+    try {
+      await apiFetch("/api/auth/verify-email", {
+        method: "POST",
+        body: JSON.stringify({ code: verifyCode }),
+      });
+      setEmailVerified(true);
+      setShowVerifyModal(false);
+      setVerifyCode("");
+      setVerifySuccess("Email verified successfully!");
+      // Clear success message after 3 seconds
+      setTimeout(() => setVerifySuccess(""), 3000);
+    } catch (err) {
+      setVerifyError(err.message);
+    } finally {
+      setVerifyLoading(false);
+    }
   };
 
   // ============================================================
@@ -3903,11 +4455,154 @@ function Stash() {
         />
       )}
 
+      {/* Email verification modal — appears when user clicks "Send Code" on the banner */}
+      {showVerifyModal && (
+        <div
+          onClick={() => { setShowVerifyModal(false); setVerifyError(""); setVerifyCode(""); }}
+          style={{
+            position: "fixed", inset: 0,
+            background: theme.overlayBg,
+            backdropFilter: "blur(16px)",
+            zIndex: 950,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            animation: "softFadeIn 0.25s ease",
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: theme.settingsBg,
+              borderRadius: "20px",
+              border: `1px solid ${theme.border}`,
+              padding: "32px 28px",
+              width: "92%",
+              maxWidth: "380px",
+              boxShadow: theme.shadowHover,
+              animation: "settingsIn 0.35s ease",
+            }}
+          >
+            <h3 style={{
+              fontFamily: "'Lora', serif", fontSize: "20px", fontWeight: 400,
+              color: theme.textSecondary, margin: "0 0 8px",
+            }}>Verify your email</h3>
+            <p style={{
+              fontFamily: "'DM Sans', sans-serif", fontSize: "13px",
+              color: theme.textFaint, margin: "0 0 20px",
+            }}>Enter the 6-digit code sent to your email</p>
+            <input
+              type="text"
+              value={verifyCode}
+              onChange={e => { setVerifyCode(e.target.value.replace(/\D/g, "").slice(0, 6)); setVerifyError(""); }}
+              placeholder="000000"
+              maxLength={6}
+              style={{
+                width: "100%",
+                padding: "12px 14px",
+                borderRadius: "12px",
+                border: `1px solid ${theme.border}`,
+                background: theme.inputBg,
+                color: theme.textPrimary,
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: "20px",
+                letterSpacing: "0.3em",
+                textAlign: "center",
+                outline: "none",
+                boxSizing: "border-box",
+                marginBottom: "16px",
+              }}
+            />
+            {verifyError && (
+              <div style={{
+                color: theme.deleteColor, fontSize: "13px",
+                fontFamily: "'DM Sans', sans-serif", marginBottom: "12px", textAlign: "center",
+              }}>{verifyError}</div>
+            )}
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                onClick={() => { setShowVerifyModal(false); setVerifyError(""); setVerifyCode(""); }}
+                style={{
+                  flex: 1, padding: "12px", borderRadius: "12px",
+                  border: `1px solid ${theme.border}`, background: "none",
+                  color: theme.textSecondary, fontFamily: "'DM Sans', sans-serif",
+                  fontSize: "14px", cursor: "pointer",
+                }}
+              >Cancel</button>
+              <button
+                onClick={submitVerificationCode}
+                disabled={verifyCode.length !== 6 || verifyLoading}
+                style={{
+                  flex: 1, padding: "12px", borderRadius: "12px",
+                  border: "none",
+                  background: (verifyCode.length !== 6 || verifyLoading) ? theme.disabledBg : theme.accentGradient,
+                  color: (verifyCode.length !== 6 || verifyLoading) ? theme.disabledText : "#FFFFFF",
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: "14px", fontWeight: 500, cursor: (verifyCode.length !== 6 || verifyLoading) ? "default" : "pointer",
+                }}
+              >{verifyLoading ? "Verifying..." : "Verify"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ===== MAIN CONTENT — 720px max gives cards more breathing room on desktop ===== */}
       <div style={{
         maxWidth: "720px", margin: "0 auto", padding: "40px 20px",
         animation: "softFadeIn 0.6s ease",
       }}>
+        {/* Email verification banner — shows when user hasn't verified their email */}
+        {!emailVerified && token && (
+          <div style={{
+            background: "#FFF3CD",
+            border: "1px solid #FFECB5",
+            borderRadius: "14px",
+            padding: "14px 18px",
+            marginBottom: "20px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "12px",
+            animation: "cardIn 0.4s ease",
+          }}>
+            <span style={{
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: "13.5px",
+              color: "#5C5347",
+            }}>Please verify your email to enable digest emails.</span>
+            <button
+              onClick={sendVerificationCode}
+              disabled={verifyLoading}
+              style={{
+                background: "#6B5F53",
+                color: "#FFFFFF",
+                border: "none",
+                borderRadius: "10px",
+                padding: "8px 16px",
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: "13px",
+                fontWeight: 500,
+                cursor: verifyLoading ? "default" : "pointer",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+                opacity: verifyLoading ? 0.6 : 1,
+              }}
+            >{verifyLoading ? "Sending..." : "Send Code"}</button>
+          </div>
+        )}
+        {verifyError && !showVerifyModal && (
+          <div style={{
+            color: theme.deleteColor, fontSize: "13px",
+            fontFamily: "'DM Sans', sans-serif", marginBottom: "12px", textAlign: "center",
+          }}>{verifyError}</div>
+        )}
+        {verifySuccess && (
+          <div style={{
+            background: theme.checkBg, color: theme.checkColor,
+            borderRadius: "14px", padding: "12px 18px",
+            fontFamily: "'DM Sans', sans-serif", fontSize: "13.5px",
+            marginBottom: "20px", textAlign: "center",
+            animation: "cardIn 0.4s ease",
+          }}>{verifySuccess}</div>
+        )}
         {/* Header — slightly larger title with letter-spacing for a "branded" feel,
             plus a subtle bottom border gradient to separate header from content */}
         <header style={{
