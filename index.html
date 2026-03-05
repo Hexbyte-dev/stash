@@ -1560,7 +1560,9 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
                 so each type has a distinctive but subtle color identity on the card */}
             <span style={{
               fontSize: "11px",
-              color: TYPE_COLORS[item.type] || typeColors.color,
+              // Use the theme-aware color for text (brighter in dark mode for contrast)
+              // but TYPE_COLORS for the background tint (decorative, contrast less critical)
+              color: typeColors.color,
               background: `${TYPE_COLORS[item.type] || typeColors.color}22`,
               padding: "4px 12px",
               borderRadius: "24px",
