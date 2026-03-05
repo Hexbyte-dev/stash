@@ -12,7 +12,12 @@
 // 3. On activate: clean up old caches
 // ============================================================
 
-const CACHE_NAME = "stash-v1";
+// Bump this version whenever you deploy changes.
+// When the service worker installs with a new CACHE_NAME, the
+// "activate" handler deletes all old caches, forcing the browser
+// to fetch fresh files from the server. Without this, the PWA
+// keeps serving stale cached files indefinitely.
+const CACHE_NAME = "stash-v2";
 
 // Core files to cache immediately on install
 // Fix #1: Pinned to exact versions to match index.html (prevents version drift)
