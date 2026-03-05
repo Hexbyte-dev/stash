@@ -1779,8 +1779,137 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
             </div>
           ) : (
             // --- DISPLAY MODE (click content to edit) ---
+            // Type-specific layouts: different stash types get tailored card displays.
+            // Links show clickable URLs, contacts show structured fields, everything
+            // else uses the default text layout. This makes each type more useful at a glance.
             <div>
-              {item.content && (
+              {/* LINK-TYPE: Make URLs clickable so users can visit saved links directly.
+                  We detect URLs using a regex and wrap them in <a> tags.
+                  target="_blank" opens in a new tab; rel="noopener noreferrer" is a security
+                  best practice that prevents the new page from accessing our window object. */}
+              {item.type === "link" && item.content && !isEditing && (() => {
+                // This regex finds URLs starting with http:// or https://
+                // The "g" flag means "global" — find ALL matches, not just the first one
+                const urlRegex = /(https?:\/\/[^\s]+)/g;
+                // split() with a regex that has capture groups keeps the matched parts
+                // in the array. So "check out https://example.com cool" becomes:
+                // ["check out ", "https://example.com", " cool"]
+                const parts = item.content.split(urlRegex);
+                return (
+                  <p onClick={startEditing} style={{
+                    margin: 0, color: theme.textPrimary, fontSize: "15.5px",
+                    lineHeight: "1.65", fontFamily: "'Lora', serif",
+                    wordBreak: "break-word", whiteSpace: "pre-wrap",
+                    textDecoration: isCompleted ? "line-through" : "none",
+                    textDecorationColor: theme.textGhost,
+                    cursor: isCompleted ? "default" : "text",
+                    borderRadius: "6px", padding: "2px 0",
+                    transition: "background 0.2s ease",
+                  }}
+                    onMouseEnter={e => { if (!isCompleted) e.currentTarget.style.background = theme.hoverBg; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+                    title={isCompleted ? "" : "Click to edit"}
+                  >
+                    {parts.map((part, i) => {
+                      // IMPORTANT: Regex with the "g" flag remembers where it left off
+                      // via .lastIndex. We must reset it before each .test() call,
+                      // otherwise it alternates between true/false unexpectedly.
+                      urlRegex.lastIndex = 0;
+                      return urlRegex.test(part)
+                        ? <a key={i} href={part} target="_blank" rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            style={{
+                              color: theme.types?.link?.color || "#7E9BB5",
+                              textDecoration: "underline",
+                              textDecorationColor: (theme.types?.link?.color || "#7E9BB5") + "44",
+                              textUnderlineOffset: "3px",
+                            }}><HighlightText text={part} query={searchQuery} theme={theme} /></a>
+                        : <HighlightText key={i} text={part} query={searchQuery} theme={theme} />;
+                    })}
+                  </p>
+                );
+              })()}
+
+              {/* CONTACT-TYPE: Show structured fields from OCR data instead of raw text.
+                  When we scan a business card, Claude extracts fields like name, phone, email
+                  into ocrData. Here we display those fields with icons, making contacts
+                  scannable at a glance instead of showing a wall of unformatted text.
+                  Works for both "contact" and "person" type stashes. */}
+              {(item.type === "contact" || item.type === "person") && item.ocrData && !isEditing && (
+                <div style={{ marginTop: "4px" }}>
+                  {/* Name gets the biggest, most prominent styling */}
+                  {item.ocrData.name && (
+                    <div style={{ fontSize: "17px", fontFamily: "'Lora', serif", fontWeight: 500, color: theme.textPrimary, marginBottom: "6px" }}>
+                      <HighlightText text={item.ocrData.name} query={searchQuery} theme={theme} />
+                    </div>
+                  )}
+                  {/* Title + company on one line when both exist, e.g. "Designer at Acme" */}
+                  {item.ocrData.title && (
+                    <div style={{ fontSize: "13.5px", fontFamily: "'DM Sans', sans-serif", color: theme.textSecondary, marginBottom: "2px" }}>
+                      <HighlightText text={item.ocrData.title} query={searchQuery} theme={theme} />
+                      {item.ocrData.company && <span> at <HighlightText text={item.ocrData.company} query={searchQuery} theme={theme} /></span>}
+                    </div>
+                  )}
+                  {/* Show company alone only if there's no title (avoids duplication) */}
+                  {!item.ocrData.title && item.ocrData.company && (
+                    <div style={{ fontSize: "13.5px", fontFamily: "'DM Sans', sans-serif", color: theme.textSecondary, marginBottom: "2px" }}>
+                      <HighlightText text={item.ocrData.company} query={searchQuery} theme={theme} />
+                    </div>
+                  )}
+                  {/* Contact detail rows — each is a clickable action (call, email, visit).
+                      We use <a> tags with tel:, mailto:, and https:// protocols so the
+                      phone/browser knows how to handle each type of link natively. */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginTop: "8px" }}>
+                    {item.ocrData.phone && (
+                      <a href={`tel:${item.ocrData.phone}`} onClick={e => e.stopPropagation()} style={{
+                        fontSize: "13px", fontFamily: "'DM Sans', sans-serif",
+                        color: theme.textMuted, textDecoration: "none",
+                        display: "flex", alignItems: "center", gap: "8px",
+                      }}>
+                        <span style={{ fontSize: "11px", opacity: 0.6 }}>☎</span>
+                        {item.ocrData.phone}
+                      </a>
+                    )}
+                    {item.ocrData.email && (
+                      <a href={`mailto:${item.ocrData.email}`} onClick={e => e.stopPropagation()} style={{
+                        fontSize: "13px", fontFamily: "'DM Sans', sans-serif",
+                        color: theme.textMuted, textDecoration: "none",
+                        display: "flex", alignItems: "center", gap: "8px",
+                      }}>
+                        <span style={{ fontSize: "11px", opacity: 0.6 }}>✉</span>
+                        {item.ocrData.email}
+                      </a>
+                    )}
+                    {item.ocrData.website && (
+                      <a href={item.ocrData.website.startsWith("http") ? item.ocrData.website : `https://${item.ocrData.website}`}
+                        target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{
+                        fontSize: "13px", fontFamily: "'DM Sans', sans-serif",
+                        color: theme.textMuted, textDecoration: "none",
+                        display: "flex", alignItems: "center", gap: "8px",
+                      }}>
+                        <span style={{ fontSize: "11px", opacity: 0.6 }}>↗</span>
+                        {item.ocrData.website}
+                      </a>
+                    )}
+                    {item.ocrData.address && (
+                      <div style={{
+                        fontSize: "13px", fontFamily: "'DM Sans', sans-serif",
+                        color: theme.textGhost, display: "flex", alignItems: "center", gap: "8px",
+                        marginTop: "2px",
+                      }}>
+                        <span style={{ fontSize: "11px", opacity: 0.6 }}>◇</span>
+                        {item.ocrData.address}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* DEFAULT LAYOUT: Used for all other types (note, idea, food, etc.)
+                  and also for contacts/persons that don't have ocrData yet.
+                  The condition excludes link-type (handled above) and contact/person
+                  with ocrData (also handled above) so we don't render content twice. */}
+              {item.content && !(item.type === "link" && !isEditing) && !((item.type === "contact" || item.type === "person") && item.ocrData && !isEditing) && (
                 <p
                   onClick={startEditing}
                   style={{
