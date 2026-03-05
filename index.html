@@ -2351,6 +2351,15 @@ function Stash() {
   const undoTimerRef = useRef(null);
   const [bulkMode, setBulkMode] = useState(false);          // bulk select mode
   const [bulkSelected, setBulkSelected] = useState(new Set()); // selected item IDs
+
+  // ── Advanced filter state ──────────────────────────────────
+  // These four pieces of state power the collapsible "Advanced Filters"
+  // panel.  They live alongside the other filter state (searchQuery,
+  // filterType, sortOrder) so the filteredItems memo can reference them.
+  const [advancedOpen, setAdvancedOpen] = useState(false);   // is the panel expanded?
+  const [dateFrom, setDateFrom] = useState("");              // ISO date string, e.g. "2026-03-01"
+  const [dateTo, setDateTo] = useState("");                  // ISO date string for the end date
+  const [tagFilter, setTagFilter] = useState("");            // comma-separated tag names
   const [slidingOut, setSlidingOut] = useState(new Set());   // items currently animating out
   const [confirmClearAll, setConfirmClearAll] = useState(false); // confirm before clearing completed
   const [settings, setSettings] = useState({
@@ -2860,7 +2869,23 @@ function Stash() {
       (item.content || "").toLowerCase().includes(raw) ||
       (item.tags || []).some(t => t.includes(stripped));
     const matchesType = filterType === "all" || item.type === filterType;
-    return matchesSearch && matchesType;
+
+    // ── Advanced filters ──────────────────────────────────────
+    // Date range: compare the item's createdAt against the user-chosen
+    // boundaries.  We append "T23:59:59" to dateTo so the entire end-day
+    // is included (otherwise midnight would cut it off early).
+    const matchesDateFrom = !dateFrom || new Date(item.createdAt) >= new Date(dateFrom);
+    const matchesDateTo   = !dateTo   || new Date(item.createdAt) <= new Date(dateTo + "T23:59:59");
+
+    // Multi-tag filter: split the comma-separated input into individual
+    // tags, trim whitespace, then require the item to contain ALL of
+    // them.  `.every()` returns true when the array is empty, so when
+    // the user hasn't typed anything every item passes.
+    const filterTags = tagFilter.split(",").map(t => t.trim().toLowerCase()).filter(t => t.length > 0);
+    const matchesTags = filterTags.length === 0 ||
+      filterTags.every(ft => (item.tags || []).some(t => t.toLowerCase().includes(ft)));
+
+    return matchesSearch && matchesType && matchesDateFrom && matchesDateTo && matchesTags;
   }).sort((a, b) => {
     // Pinned items float to top within their group
     if (a.pinned && !b.pinned) return -1;
@@ -3373,6 +3398,144 @@ function Stash() {
                 <span style={{ fontSize: "10px" }}>{sortOrder === "newest" ? "↓" : "↑"}</span>
                 {sortOrder === "newest" ? "Newest first" : "Oldest first"}
               </button>
+            </div>
+
+            {/* ── Advanced Filters ───────────────────────────────────
+                A collapsible panel that reveals date-range and multi-tag
+                filtering controls.  It sits below the sort row and above
+                the bulk-action bar so it doesn't interrupt the main
+                workflow.
+
+                KEY CONCEPTS FOR BEGINNERS:
+                • The ▸ arrow rotates via a CSS transform when the panel
+                  is open — a cheap micro-animation that signals
+                  expandability.
+                • The "active" badge only appears when at least one
+                  filter has a value, using a short-circuit expression:
+                  `(condition) && <JSX>`.
+                • Native <input type="date"> gives us a free calendar
+                  picker on every modern browser — no library needed!
+                • The Clear Filters button also only renders when one or
+                  more filters are set, keeping the UI tidy by default.
+            */}
+            <div style={{ marginTop: "8px" }}>
+              <button
+                onClick={() => setAdvancedOpen(prev => !prev)}
+                style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  color: (dateFrom || dateTo || tagFilter) ? theme.accent : theme.textMuted,
+                  fontSize: "12px", fontFamily: "'DM Sans', sans-serif",
+                  padding: "3px 0", display: "flex", alignItems: "center", gap: "6px",
+                  transition: "color 0.2s ease",
+                }}
+              >
+                {/* The arrow character rotates 90° when the panel opens.
+                    transform + transition create a smooth spin effect. */}
+                <span style={{
+                  fontSize: "10px", transition: "transform 0.2s ease",
+                  transform: advancedOpen ? "rotate(90deg)" : "rotate(0deg)",
+                  display: "inline-block",
+                }}>▸</span>
+                Advanced filters
+                {/* "active" pill — only rendered when a filter is set */}
+                {(dateFrom || dateTo || tagFilter) && (
+                  <span style={{
+                    fontSize: "10px", background: theme.accent + "22",
+                    color: theme.accent, borderRadius: "10px",
+                    padding: "1px 8px",
+                  }}>active</span>
+                )}
+              </button>
+
+              {/* The panel itself — only mounts when advancedOpen is true.
+                  This is called "conditional rendering": React skips
+                  everything inside the `&&` when the left side is false. */}
+              {advancedOpen && (
+                <div style={{
+                  marginTop: "10px", padding: "14px",
+                  background: theme.cardBg, borderRadius: "12px",
+                  border: `1px solid ${theme.border}`,
+                  animation: "softFadeIn 0.2s ease",
+                }}>
+                  {/* ── Date Range ──────────────────────────────────── */}
+                  <div style={{ marginBottom: "14px" }}>
+                    <div style={{
+                      fontFamily: "'DM Sans', sans-serif", fontSize: "12px",
+                      color: theme.textMuted, marginBottom: "8px", fontWeight: 500,
+                    }}>Date range</div>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      {/* <input type="date"> renders a native date picker.
+                          Its value is an ISO string like "2026-03-05". */}
+                      <input
+                        type="date" value={dateFrom}
+                        onChange={e => setDateFrom(e.target.value)}
+                        style={{
+                          flex: 1, background: theme.hoverBg,
+                          border: `1px solid ${theme.border}`,
+                          borderRadius: "8px", padding: "6px 10px",
+                          color: theme.textPrimary, fontSize: "12px",
+                          fontFamily: "'DM Sans', sans-serif",
+                        }}
+                      />
+                      <span style={{ color: theme.textGhost, fontSize: "12px" }}>to</span>
+                      <input
+                        type="date" value={dateTo}
+                        onChange={e => setDateTo(e.target.value)}
+                        style={{
+                          flex: 1, background: theme.hoverBg,
+                          border: `1px solid ${theme.border}`,
+                          borderRadius: "8px", padding: "6px 10px",
+                          color: theme.textPrimary, fontSize: "12px",
+                          fontFamily: "'DM Sans', sans-serif",
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* ── Tag Filter ──────────────────────────────────── */}
+                  <div style={{ marginBottom: "14px" }}>
+                    <div style={{
+                      fontFamily: "'DM Sans', sans-serif", fontSize: "12px",
+                      color: theme.textMuted, marginBottom: "8px", fontWeight: 500,
+                    }}>Filter by tags</div>
+                    {/* A plain text input — the filtering logic in
+                        filteredItems splits on commas and matches. */}
+                    <input
+                      type="text" value={tagFilter}
+                      onChange={e => setTagFilter(e.target.value)}
+                      placeholder="e.g. recipe, italian"
+                      style={{
+                        width: "100%", background: theme.hoverBg,
+                        border: `1px solid ${theme.border}`,
+                        borderRadius: "8px", padding: "7px 12px",
+                        color: theme.textPrimary, fontSize: "13px",
+                        fontFamily: "'DM Sans', sans-serif",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                    <div style={{
+                      fontFamily: "'DM Sans', sans-serif", fontSize: "11px",
+                      color: theme.textGhost, fontStyle: "italic", marginTop: "4px",
+                    }}>Comma-separated — shows items with ALL specified tags</div>
+                  </div>
+
+                  {/* ── Clear Filters ───────────────────────────────── */}
+                  {/* Only show the button when at least one filter has a
+                      value — keeps the panel clean when nothing is set. */}
+                  {(dateFrom || dateTo || tagFilter) && (
+                    <button
+                      onClick={() => { setDateFrom(""); setDateTo(""); setTagFilter(""); }}
+                      style={{
+                        background: "none", border: `1px solid ${theme.border}`,
+                        color: theme.textMuted, borderRadius: "8px",
+                        padding: "5px 14px", fontSize: "12px",
+                        fontFamily: "'DM Sans', sans-serif",
+                        cursor: "pointer", transition: "all 0.2s ease",
+                      }}
+                    >Clear filters</button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Bulk action bar */}
