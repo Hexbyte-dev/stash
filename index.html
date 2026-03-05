@@ -1380,8 +1380,54 @@ const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, ite
 };
 
 // ============================================================
+// HIGHLIGHT TEXT
+//
+// Wraps matching portions of text in a highlighted <mark> tag.
+// Used when the search bar has a query — matching text gets a
+// colored background so you can see exactly why each card appeared.
+//
+// How it works:
+// 1. Split the text using the search query as a delimiter
+// 2. The parts that DON'T match render as plain text
+// 3. The parts that DO match render inside a <mark> tag
+// 4. The regex uses "gi" flags: g = all matches, i = case-insensitive
+// ============================================================
+const HighlightText = ({ text, query, theme }) => {
+  // If there's no search query or no text, just return the text as-is.
+  // This means highlighting has ZERO cost when nobody is searching.
+  if (!query || !text) return text || null;
+
+  // Escape special regex characters in the query so searching for
+  // "test (1)" doesn't break — the parens would be regex syntax otherwise
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`(${escaped})`, 'gi');
+
+  // Split the text on the search query. The capturing group "()" in the
+  // regex means the matched parts are KEPT in the resulting array.
+  // Example: "Hello World".split(/(World)/gi) => ["Hello ", "World", ""]
+  const parts = String(text).split(regex);
+
+  if (parts.length === 1) return text; // no match found, return plain text
+
+  return parts.map((part, i) =>
+    // regex.test() checks if this part is a match (case-insensitive).
+    // NOTE: We recreate the test each time because regex with "g" flag
+    // has internal state (lastIndex). Using a fresh test each iteration
+    // avoids that gotcha.
+    new RegExp(`^${escaped}$`, 'i').test(part)
+      ? <mark key={i} style={{
+          backgroundColor: theme?.accent ? theme.accent + '33' : '#C9A84C33',
+          color: 'inherit',
+          borderRadius: '2px',
+          padding: '0 2px',
+        }}>{part}</mark>
+      : part
+  );
+};
+
+// ============================================================
 // STASH CARD — with inline editing!
-// 
+//
 // NEW CONCEPT: "Inline editing"
 // Instead of opening a separate edit screen (like a modal or
 // new page), we transform the card ITSELF into an editable
@@ -1392,7 +1438,7 @@ const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, ite
 // The card manages its own edit mode independently — this is
 // called "component-level state" vs "app-level state."
 // ============================================================
-const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTogglePin, onScanCard, isScanning, theme, timezone, customCategories, isSlidingOut, bulkMode, isSelected, onToggleBulkSelect }) => {
+const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTogglePin, onScanCard, isScanning, theme, timezone, customCategories, isSlidingOut, bulkMode, isSelected, onToggleBulkSelect, searchQuery }) => {
   const typeInfo = getTypeInfo(item.type, customCategories);
   const typeColors = getTypeColors(item.type, theme, customCategories);
   const isCompleted = item.completed;
@@ -1755,7 +1801,7 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
                   onMouseEnter={e => { if (!isCompleted) e.currentTarget.style.background = theme.hoverBg; }}
                   onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
                   title={isCompleted ? "" : "Click to edit"}
-                >{item.content}</p>
+                ><HighlightText text={item.content} query={searchQuery} theme={theme} /></p>
               )}
 
               {item.tags && item.tags.length > 0 && (
@@ -1774,7 +1820,7 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
                       padding: "3px 10px",
                       borderRadius: "8px",
                       fontFamily: "'DM Sans', sans-serif",
-                    }}>#{tag}</span>
+                    }}>#<HighlightText text={tag} query={searchQuery} theme={theme} /></span>
                   ))}
                 </div>
               )}
@@ -3465,6 +3511,7 @@ function Stash() {
                           bulkMode={bulkMode}
                           isSelected={bulkSelected.has(item.id)}
                           onToggleBulkSelect={toggleBulkSelect}
+                          searchQuery={searchQuery}
                         />
                       ))}
                     </div>
@@ -3611,6 +3658,7 @@ function Stash() {
                           bulkMode={bulkMode}
                           isSelected={bulkSelected.has(item.id)}
                           onToggleBulkSelect={toggleBulkSelect}
+                          searchQuery={searchQuery}
                         />
                       ))}
                     </div>
