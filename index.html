@@ -3694,6 +3694,11 @@ function Stash() {
     const files = Array.from(e.dataTransfer.files);
     const imageFile = files.find(f => f.type.startsWith("image/"));
     if (imageFile) {
+      const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
+      if (imageFile.size > MAX_IMAGE_SIZE) {
+        alert("Image too large. Maximum size is 10 MB.");
+        return;
+      }
       try {
         const base64 = await readFileAsBase64(imageFile);
         const compressed = await compressImage(base64);
@@ -4192,6 +4197,11 @@ function Stash() {
   const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
     if (file?.type.startsWith("image/")) {
+      const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
+      if (file.size > MAX_IMAGE_SIZE) {
+        alert("Image too large. Maximum size is 10 MB.");
+        return;
+      }
       try {
         const base64 = await readFileAsBase64(file);
         const compressed = await compressImage(base64);
