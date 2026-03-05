@@ -1539,9 +1539,11 @@ const ReminderPicker = ({ onPick, onClose, theme }) => {
             onClick={() => {
               if (customDate && customTime) {
                 // Combine date + time into a full ISO string
-                onPick(new Date(`${customDate}T${customTime}`).toISOString());
+                const parsed = new Date(`${customDate}T${customTime}`);
+                if (isNaN(parsed.getTime())) return; // guard against invalid date
+                onPick(parsed.toISOString());
               }
-            }}
+            }
             disabled={!customDate || !customTime}
             style={{
               background: (customDate && customTime) ? theme.accentGradient : theme.disabledBg,
@@ -2012,7 +2014,7 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
                       phone/browser knows how to handle each type of link natively. */}
                   <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginTop: "8px" }}>
                     {item.ocrData.phone && (
-                      <a href={`tel:${item.ocrData.phone}`} onClick={e => e.stopPropagation()} style={{
+                      <a href={`tel:${item.ocrData.phone.replace(/[^\d+\-() ]/g, "")}`} onClick={e => e.stopPropagation()} style={{
                         fontSize: "13px", fontFamily: "'DM Sans', sans-serif",
                         color: theme.textMuted, textDecoration: "none",
                         display: "flex", alignItems: "center", gap: "8px",
@@ -2022,7 +2024,7 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
                       </a>
                     )}
                     {item.ocrData.email && (
-                      <a href={`mailto:${item.ocrData.email}`} onClick={e => e.stopPropagation()} style={{
+                      <a href={`mailto:${item.ocrData.email.split("?")[0]}`} onClick={e => e.stopPropagation()} style={{
                         fontSize: "13px", fontFamily: "'DM Sans', sans-serif",
                         color: theme.textMuted, textDecoration: "none",
                         display: "flex", alignItems: "center", gap: "8px",
@@ -3334,22 +3336,28 @@ function Stash() {
   // so ["recipe", "italian", "recipe"] becomes ["recipe", "italian"].
   // ============================================================
   const bulkAddTags = (ids, newTags) => {
+    // Pre-compute merged tags from current state so server sync
+    // uses the correct values (not a stale closure).
+    const currentItems = itemsRef.current;
+    const mergedMap = new Map();
+    ids.forEach(id => {
+      const item = currentItems.find(i => i.id === id);
+      if (item) {
+        mergedMap.set(id, [...new Set([...(item.tags || []), ...newTags])]);
+      }
+    });
+
     setItems(prev => prev.map(item => {
       if (!ids.has(item.id)) return item;
-      // Union: combine existing tags with new ones, deduplicate
-      const merged = [...new Set([...(item.tags || []), ...newTags])];
+      const merged = mergedMap.get(item.id) || [...new Set([...(item.tags || []), ...newTags])];
       return { ...item, tags: merged };
     }));
-    // Sync each to server
-    ids.forEach(id => {
-      const item = items.find(i => i.id === id);
-      if (item) {
-        const merged = [...new Set([...(item.tags || []), ...newTags])];
-        apiFetch(`/api/stashes/${id}`, {
-          method: "PUT",
-          body: JSON.stringify({ tags: merged }),
-        }).catch(err => console.error("[Sync] Bulk tag failed:", err.message));
-      }
+    // Sync each to server using pre-computed merged tags
+    mergedMap.forEach((merged, id) => {
+      apiFetch(`/api/stashes/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ tags: merged }),
+      }).catch(err => console.error("[Sync] Bulk tag failed:", err.message));
     });
     setBulkSelected(new Set());
     setBulkMode(false);
@@ -3362,6 +3370,8 @@ function Stash() {
   // Useful when auto-detection got it wrong for several items.
   // ============================================================
   const bulkRetype = (ids, newType) => {
+    // Validate newType is a known type before applying
+    if (!typeLabels[newType]) return;
     setItems(prev => prev.map(item =>
       ids.has(item.id) ? { ...item, type: newType } : item
     ));
@@ -3563,7 +3573,11 @@ function Stash() {
     // "Allow notifications?" — the user must click Allow for it to work.
     // We only ask once (when permission is "default" = not yet decided).
     if (value && "Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
+      Notification.requestPermission().then(result => {
+        if (result === "denied") {
+          console.warn("[Reminders] Notification permission denied — reminders will still work but won't show alerts");
+        }
+      });
     }
   };
 
@@ -3577,11 +3591,19 @@ function Stash() {
   // (returned by useEffect) calls clearInterval to stop it when the
   // component unmounts — without this, the timer would keep running
   // forever, causing a "memory leak."
+  // Fix: Use itemsRef (already defined above) instead of items in the
+  // dependency array. Reading from a ref means this effect runs once on
+  // mount and the interval keeps working — without re-creating the timer
+  // every time items changes (which caused a render cascade).
   useEffect(() => {
     const checkReminders = () => {
       const now = new Date();
-      items.forEach(item => {
+      const currentItems = itemsRef.current;
+      const firedIds = new Set();
+
+      currentItems.forEach(item => {
         if (item.reminder && new Date(item.reminder) <= now && !item.completed) {
+          firedIds.add(item.id);
           // Fire a browser notification if we have permission
           if ("Notification" in window && Notification.permission === "granted") {
             new Notification("Stash Reminder", {
@@ -3589,10 +3611,6 @@ function Stash() {
               icon: "/icon-192.png",
             });
           }
-          // Clear the reminder after firing so it doesn't fire again
-          setItems(prev => prev.map(i =>
-            i.id === item.id ? { ...i, reminder: null } : i
-          ));
           // Also clear on the server
           apiFetch(`/api/stashes/${item.id}`, {
             method: "PUT",
@@ -3600,12 +3618,19 @@ function Stash() {
           }).catch(err => console.error("[Sync] Reminder clear failed:", err.message));
         }
       });
+
+      // Batch all fired reminders into a single setItems call
+      if (firedIds.size > 0) {
+        setItems(prev => prev.map(i =>
+          firedIds.has(i.id) ? { ...i, reminder: null } : i
+        ));
+      }
     };
 
     const timer = setInterval(checkReminders, 30000); // every 30 seconds
-    checkReminders(); // also check immediately on mount / items change
+    checkReminders(); // also check immediately on mount
     return () => clearInterval(timer); // cleanup: stop the timer
-  }, [items]);
+  }, []); // empty deps — reads from itemsRef.current
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addItem(); }
