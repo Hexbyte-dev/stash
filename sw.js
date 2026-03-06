@@ -17,20 +17,21 @@
 // "activate" handler deletes all old caches, forcing the browser
 // to fetch fresh files from the server. Without this, the PWA
 // keeps serving stale cached files indefinitely.
-const CACHE_NAME = "stash-v6";
+const CACHE_NAME = "stash-v7";
 
 // Core files to cache immediately on install
 // Fix #1: Pinned to exact versions to match index.html (prevents version drift)
 const CORE_ASSETS = [
   "/",
   "/index.html",
+  "/boot.js",
+  "/app.js",
   "/manifest.json",
   "/icon-192.png",
   "/icon-512.png",
   // React from CDN — pinned versions, cached locally for offline
   "https://unpkg.com/react@18.3.1/umd/react.production.min.js",
   "https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js",
-  "https://unpkg.com/@babel/standalone@7.26.9/babel.min.js",
   // Fonts
   "https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap",
   "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
@@ -41,7 +42,7 @@ const CORE_ASSETS = [
 // (e.g. tracking pixels, third-party scripts from ads, etc.)
 const CACHEABLE_ORIGINS = [
   self.location.origin,           // our own app (e.g. localhost or Netlify)
-  'https://unpkg.com',            // React + Babel CDN
+  'https://unpkg.com',            // React CDN
   'https://fonts.googleapis.com', // Font CSS files
   'https://fonts.gstatic.com',    // Actual font files
 ];

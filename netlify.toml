@@ -1,0 +1,5 @@
+[build]
+  # Install deps and compile JSX before deploying
+  command = "npm install && npm run build"
+  # Serve the repo root (index.html, app.js, sw.js, icons, etc.)
+  publish = "."
