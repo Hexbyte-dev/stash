@@ -1,6 +1,4 @@
 [build]
-  # Install ALL deps (including devDependencies needed for Babel build)
-  # then compile JSX into plain JS before deploying
-  command = "npm install --include=dev && npm run build"
-  # Serve the repo root (index.html, app.js, sw.js, icons, etc.)
+  # No build step — app.js is pre-built and committed.
+  # This avoids using Netlify build minutes.
   publish = "."
