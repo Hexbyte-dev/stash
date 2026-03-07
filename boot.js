@@ -38,7 +38,7 @@ window.storage = {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/sw.js")
+      .register("./sw.js")
       .then((reg) => console.log("[PWA] Service worker registered:", reg.scope))
       .catch((err) => console.log("[PWA] Service worker registration failed:", err));
   });

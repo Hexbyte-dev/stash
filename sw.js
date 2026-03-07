@@ -17,18 +17,18 @@
 // "activate" handler deletes all old caches, forcing the browser
 // to fetch fresh files from the server. Without this, the PWA
 // keeps serving stale cached files indefinitely.
-const CACHE_NAME = "stash-v7";
+const CACHE_NAME = "stash-v8";
 
 // Core files to cache immediately on install
 // Fix #1: Pinned to exact versions to match index.html (prevents version drift)
 const CORE_ASSETS = [
-  "/",
-  "/index.html",
-  "/boot.js",
-  "/app.js",
-  "/manifest.json",
-  "/icon-192.png",
-  "/icon-512.png",
+  "./",
+  "./index.html",
+  "./boot.js",
+  "./app.js",
+  "./manifest.json",
+  "./icon-192.png",
+  "./icon-512.png",
   // React from CDN — pinned versions, cached locally for offline
   "https://unpkg.com/react@18.3.1/umd/react.production.min.js",
   "https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js",
@@ -134,7 +134,7 @@ self.addEventListener("fetch", (event) => {
           // Network failed and nothing in cache
           // Return offline fallback for navigation requests
           if (request.mode === "navigate") {
-            return caches.match("/index.html");
+            return caches.match("./index.html");
           }
           return new Response("Offline", { status: 503 });
         });
