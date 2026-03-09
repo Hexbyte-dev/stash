@@ -417,26 +417,34 @@ const BACKEND_URL = "https://stash-server-production-1c71.up.railway.app";
 // every request — we just need to include { credentials: 'include' }
 // so fetch() knows to attach cookies for cross-origin requests.
 //
-// We no longer send an Authorization header. The server reads
-// the token from the cookie instead. This is a big security win
-// because JavaScript can never access an httpOnly cookie.
+// Auth uses BOTH httpOnly cookies AND a Bearer token header.
+// Cookies are the most secure option, but mobile Safari and some
+// browsers block cross-site cookies (when frontend and backend are
+// on different domains). The Bearer header is the fallback.
+// The server accepts either one (checks cookie first, then header).
 // ============================================================
 const apiFetch = async (path, options = {}) => {
+  const authToken = localStorage.getItem("stash-token");
   const headers = {
     "Content-Type": "application/json",
     ...options.headers,
   };
+  // Send Bearer token as fallback for browsers that block cross-site cookies
+  if (authToken) {
+    headers["Authorization"] = `Bearer ${authToken}`;
+  }
 
   const response = await fetch(`${BACKEND_URL}${path}`, {
     ...options,
     headers,
-    credentials: "include", // Send httpOnly cookies with every request
+    credentials: "include", // Also send httpOnly cookies where supported
   });
 
   // If the server says our token is expired or invalid,
   // we need to log out and show the login screen again
   if (response.status === 401) {
     localStorage.removeItem("stash-logged-in");
+    localStorage.removeItem("stash-token");
     // Dispatch a custom event so the Stash component can react
     window.dispatchEvent(new CustomEvent("auth-expired"));
     throw new Error("Session expired");
@@ -752,6 +760,7 @@ const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, ite
       });
       // Clear login indicator and redirect to login
       // (the server already cleared the httpOnly cookie)
+      localStorage.removeItem("stash-token");
       localStorage.removeItem("stash-logged-in");
       if (onLogout) onLogout();
     } catch (err) {
@@ -2769,9 +2778,9 @@ const LoginScreen = ({ onLogin, theme, initialError }) => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong");
-      // Success — the server sets an httpOnly cookie automatically.
-      // We save a simple flag so we know to try loading stashes on next visit.
-      localStorage.setItem("stash-logged-in", "true");
+      // Store the JWT so apiFetch can send it as a Bearer header.
+      // This is the fallback for browsers that block cross-site cookies.
+      localStorage.setItem("stash-token", data.token);
       onLogin(data.token, data.user);
     } catch (err) {
       if (err instanceof TypeError) {
@@ -2826,10 +2835,9 @@ const LoginScreen = ({ onLogin, theme, initialError }) => {
         throw new Error(data.error || "Something went wrong");
       }
 
-      // Save a login indicator (the actual JWT is in an httpOnly cookie
-      // that JavaScript can't read — this flag just helps us know whether
-      // to show the login screen or try loading stashes on the next visit)
-      localStorage.setItem("stash-logged-in", "true");
+      // Store the JWT so apiFetch can send it as a Bearer header.
+      // This is the fallback for browsers that block cross-site cookies.
+      localStorage.setItem("stash-token", data.token);
       onLogin(data.token, data.user);
     } catch (err) {
       if (err instanceof TypeError) {
@@ -3208,13 +3216,12 @@ const LoginScreen = ({ onLogin, theme, initialError }) => {
 // ============================================================
 function Stash() {
   // --- Auth state ---
-  // "token" is now just a truthy/falsy flag — the actual JWT lives in
-  // an httpOnly cookie that JavaScript can't access. We use a simple
-  // localStorage flag ("stash-logged-in") to know whether to attempt
-  // loading stashes on mount (the server will validate the real cookie).
-  const [token, setToken] = useState(localStorage.getItem("stash-logged-in"));
+  // The JWT is stored in localStorage as a fallback for browsers that
+  // block cross-site cookies (like mobile Safari). The server also sets
+  // an httpOnly cookie — whichever one reaches the server first wins.
+  const [token, setToken] = useState(localStorage.getItem("stash-token"));
   const [user, setUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(!!localStorage.getItem("stash-logged-in"));
+  const [authLoading, setAuthLoading] = useState(!!localStorage.getItem("stash-token"));
   const [authError, setAuthError] = useState("");
   // Email verification — tracks whether the user has verified their email.
   // Initialized from the user object returned by login/signup (which includes email_verified).
@@ -3228,6 +3235,7 @@ function Stash() {
   // Listen for auth-expired events from apiFetch
   useEffect(() => {
     const handleAuthExpired = () => {
+      localStorage.removeItem("stash-token");
       localStorage.removeItem("stash-logged-in");
       setToken(null);
       setUser(null);
@@ -3307,6 +3315,7 @@ function Stash() {
       // local state. The cookie will expire on its own (7 days).
       console.error("[Logout] Server unreachable:", err.message);
     }
+    localStorage.removeItem("stash-token");
     localStorage.removeItem("stash-logged-in");
     setToken(null);
     setUser(null);
@@ -3536,6 +3545,7 @@ function Stash() {
           setIsLoading(false);
         } catch (err) {
           // Cookie is invalid or expired — clear login indicator
+          localStorage.removeItem("stash-token");
           localStorage.removeItem("stash-logged-in");
           setToken(null);
           setAuthLoading(false);
