@@ -1,7 +1,7 @@
 // ============================================================
 // STORAGE SHIM
 //
-// The artifact version of Stash uses window.storage (Claude's
+// The artifact version of Squirrel uses window.storage (Claude's
 // persistent storage API). For a standalone PWA, we replace it
 // with localStorage — same interface, browser-native storage.
 //

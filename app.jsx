@@ -4,7 +4,7 @@ const { useState, useEffect, useRef, useCallback } = React;
 const APP_VERSION = "0.8";
 
 /*
-  STASH — Your Personal Memory Bank
+  SQUIRREL — Squirrel Away Your Thoughts
   v0.8: Business Card OCR + Pin Items + Export Data
   
   NEW CONCEPTS:
@@ -516,7 +516,7 @@ const exportData = (items, settings) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `stash-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `squirrel-backup-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -540,7 +540,7 @@ const exportDataFull = (items, settings) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `stash-full-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `squirrel-full-backup-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -1092,7 +1092,7 @@ const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, ite
             EMAIL DIGEST — controls daily/weekly summary emails
 
             This section lets you choose how often (or if) the server
-            sends you a summary email of your recent stashes. The
+            sends you a summary of your recent saves. The
             settings are saved to the server (not localStorage) because
             the digest worker service reads them to decide when to
             send your emails.
@@ -1109,7 +1109,7 @@ const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, ite
           <div style={{
             fontFamily: "'Lora', serif", fontSize: "12.5px",
             color: theme.textFaint, fontStyle: "italic", marginBottom: "16px",
-          }}>Get a summary of your recent stashes by email</div>
+          }}>Get a summary of your recent saves by email</div>
 
           {/* Frequency radio buttons — "radio" inputs let the user pick
               exactly ONE option from a group (unlike checkboxes which
@@ -1240,7 +1240,7 @@ const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, ite
           <div style={{
             fontFamily: "'Lora', serif", fontSize: "12.5px",
             color: theme.textFaint, fontStyle: "italic", marginBottom: "12px",
-          }}>Download a backup of all your stashes</div>
+          }}>Download a backup of all your saved items</div>
           <div style={{ display: "flex", gap: "8px" }}>
             <button
               onClick={onExport}
@@ -1305,7 +1305,7 @@ const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, ite
                       const data = JSON.parse(evt.target.result);
                       onImport(data);
                     } catch (err) {
-                      alert("Couldn't read that file. Make sure it's a Stash backup (.json).");
+                      alert("Couldn't read that file. Make sure it's a Squirrel backup (.json).");
                     }
                   };
                   reader.readAsText(file);
@@ -1438,7 +1438,7 @@ const SettingsPanel = ({ isOpen, onClose, settings, onUpdateSettings, theme, ite
               <p style={{
                 fontFamily: "'DM Sans', sans-serif", fontSize: "13px",
                 color: theme.deleteColor, marginBottom: "12px", lineHeight: 1.5,
-              }}>This will permanently delete your account and all your stashes. This cannot be undone.</p>
+              }}>This will permanently delete your account and all your saved items. This cannot be undone.</p>
               <input
                 type="password"
                 value={deletePassword}
@@ -1953,7 +1953,7 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
                 position: "relative",
               }}
             >
-              <img src={item.image} alt={item.content || "Stashed image"}
+              <img src={item.image} alt={item.content || "Squirreled image"}
                 style={{ width: "100%", display: "block", maxHeight: "200px", objectFit: "cover" }}
               />
               {isScanning && (
@@ -2683,7 +2683,7 @@ const EmptyState = ({ theme }) => (
     <p style={{
       fontFamily: "'Lora', serif", fontSize: "21px",
       color: theme.textSecondary, margin: "0 0 8px",
-    }}>Your stash is empty</p>
+    }}>Your nest is empty — squirrel something away!</p>
     <p style={{
       fontFamily: "'DM Sans', sans-serif", fontSize: "14px",
       color: theme.textFaint, margin: 0, lineHeight: 1.6,
@@ -2863,7 +2863,7 @@ const LoginScreen = ({ onLogin, theme, initialError }) => {
             <h1 style={{
               fontFamily: "'Lora', serif", fontSize: "36px", fontWeight: 400,
               color: theme.textSecondary, letterSpacing: "-0.02em", margin: "0 0 6px",
-            }}>Stash</h1>
+            }}>Squirrel</h1>
             <p style={{
               fontFamily: "'Lora', serif", fontSize: "14px",
               color: theme.textGhost, fontStyle: "italic", margin: 0,
@@ -3042,14 +3042,14 @@ const LoginScreen = ({ onLogin, theme, initialError }) => {
             color: theme.textSecondary,
             letterSpacing: "-0.02em",
             margin: "0 0 6px",
-          }}>Stash</h1>
+          }}>Squirrel</h1>
           <p style={{
             fontFamily: "'Lora', serif",
             fontSize: "14px",
             color: theme.textGhost,
             fontStyle: "italic",
             margin: 0,
-          }}>your personal memory bank</p>
+          }}>squirrel away your thoughts</p>
         </div>
 
         {/* Form card */}
@@ -3293,7 +3293,7 @@ function Stash() {
       loadDigestSettings();
     } catch (err) {
       console.error("[Auth] Failed to load stashes:", err.message);
-      setAuthError("Logged in, but couldn't load your stashes. Please refresh to try again.");
+      setAuthError("Logged in, but couldn't load your stash. Please refresh to try again.");
     } finally {
       setAuthLoading(false);
       setIsLoading(false);
@@ -3889,7 +3889,7 @@ function Stash() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `stash-selection-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `squirrel-selection-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -4084,7 +4084,7 @@ function Stash() {
           firedIds.add(item.id);
           // Fire a browser notification if we have permission
           if ("Notification" in window && Notification.permission === "granted") {
-            new Notification("Stash Reminder", {
+            new Notification("Squirrel Reminder", {
               body: item.content?.substring(0, 100) || "You have a reminder!",
               icon: "/icon-192.png",
             });
@@ -4225,7 +4225,7 @@ function Stash() {
         transition: "background 0.4s ease",
       }}>
         {/* Fix #7: Google Fonts link moved to HTML <head> — no longer duplicated here */}
-        opening your stash…
+        Gathering your nuts...
       </div>
     );
   }
@@ -4370,7 +4370,7 @@ function Stash() {
               setItems(serverData.stashes);
             }).catch(err => console.error("[Sync] Import failed:", err.message));
           } else {
-            alert("This doesn't look like a valid Stash backup file.");
+            alert("This doesn't look like a valid Squirrel backup file.");
           }
         }}
         onLogout={handleLogout}
@@ -4557,7 +4557,7 @@ function Stash() {
               fontFamily: "'Lora', serif", fontSize: "36px", fontWeight: 400,
               margin: "0 0 4px", color: theme.textSecondary,
               letterSpacing: "0.04em",
-            }}>Stash</h1>
+            }}>Squirrel</h1>
             <p style={{
               fontFamily: "'Lora', serif", fontSize: "13.5px",
               color: theme.textGhost, margin: 0, fontStyle: "italic",
@@ -4642,7 +4642,7 @@ function Stash() {
               value={inputValue}
               onChange={e => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={pendingImage ? "Add a note about this photo…" : "What would you like to remember?"}
+              placeholder={pendingImage ? "Add a note about this photo…" : "Something worth squirreling away?"}
               rows={1}
               style={{
                 flex: 1, background: "none", border: "none",
@@ -4669,7 +4669,7 @@ function Stash() {
                 transition: "all 0.3s ease", margin: "6px", whiteSpace: "nowrap",
                 opacity: hasContent ? 1 : 0.7,
               }}
-            >Stash</button>
+            >Stash it</button>
           </div>
 
           {/* Category selector — horizontal swipeable strip */}
@@ -5190,7 +5190,7 @@ function Stash() {
               link: "Paste a URL to save it here",
               contact: "Scan a business card or add contact info",
               travel: "Save flight details, hotel bookings, or trip ideas",
-              work: "Stash meeting notes, deadlines, or project ideas",
+              work: "Squirrel away meeting notes, deadlines, or project ideas",
               money: "Track expenses, invoices, or financial notes",
               health: "Log appointments, prescriptions, or wellness notes",
               media: "Save movie recs, podcast links, or playlist ideas",
@@ -5550,7 +5550,7 @@ function InstallBanner({ theme }) {
     }}>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: "14px", fontWeight: 500, color: theme.textPrimary, marginBottom: "2px" }}>
-          Install Stash
+          Install Squirrel
         </div>
         <div style={{ fontSize: "12px", color: theme.textMuted }}>
           Add to your home screen for quick access

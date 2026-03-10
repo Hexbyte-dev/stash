@@ -9,7 +9,7 @@ const {
 const APP_VERSION = "0.8";
 
 /*
-  STASH — Your Personal Memory Bank
+  SQUIRREL — Squirrel Away Your Thoughts
   v0.8: Business Card OCR + Pin Items + Export Data
   
   NEW CONCEPTS:
@@ -781,7 +781,7 @@ const exportData = (items, settings) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `stash-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `squirrel-backup-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -807,7 +807,7 @@ const exportDataFull = (items, settings) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `stash-full-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `squirrel-full-backup-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -1549,7 +1549,7 @@ const SettingsPanel = ({
       fontStyle: "italic",
       marginBottom: "16px"
     }
-  }, "Get a summary of your recent stashes by email"), /*#__PURE__*/React.createElement("div", {
+  }, "Get a summary of your recent saves by email"), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: "16px"
     }
@@ -1699,7 +1699,7 @@ const SettingsPanel = ({
       fontStyle: "italic",
       marginBottom: "12px"
     }
-  }, "Download a backup of all your stashes"), /*#__PURE__*/React.createElement("div", {
+  }, "Download a backup of all your saved items"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: "8px"
@@ -1792,7 +1792,7 @@ const SettingsPanel = ({
             const data = JSON.parse(evt.target.result);
             onImport(data);
           } catch (err) {
-            alert("Couldn't read that file. Make sure it's a Stash backup (.json).");
+            alert("Couldn't read that file. Make sure it's a Squirrel backup (.json).");
           }
         };
         reader.readAsText(file);
@@ -1967,7 +1967,7 @@ const SettingsPanel = ({
       marginBottom: "12px",
       lineHeight: 1.5
     }
-  }, "This will permanently delete your account and all your stashes. This cannot be undone."), /*#__PURE__*/React.createElement("input", {
+  }, "This will permanently delete your account and all your saved items. This cannot be undone."), /*#__PURE__*/React.createElement("input", {
     type: "password",
     value: deletePassword,
     onChange: e => {
@@ -2585,7 +2585,7 @@ const StashCard = ({
     }
   }, /*#__PURE__*/React.createElement("img", {
     src: item.image,
-    alt: item.content || "Stashed image",
+    alt: item.content || "Squirreled image",
     style: {
       width: "100%",
       display: "block",
@@ -3530,7 +3530,7 @@ const EmptyState = ({
     color: theme.textSecondary,
     margin: "0 0 8px"
   }
-}, "Your stash is empty"), /*#__PURE__*/React.createElement("p", {
+}, "Your nest is empty \u2014 squirrel something away!"), /*#__PURE__*/React.createElement("p", {
   style: {
     fontFamily: "'DM Sans', sans-serif",
     fontSize: "14px",
@@ -3749,7 +3749,7 @@ const LoginScreen = ({
         letterSpacing: "-0.02em",
         margin: "0 0 6px"
       }
-    }, "Stash"), /*#__PURE__*/React.createElement("p", {
+    }, "Squirrel"), /*#__PURE__*/React.createElement("p", {
       style: {
         fontFamily: "'Lora', serif",
         fontSize: "14px",
@@ -3998,7 +3998,7 @@ const LoginScreen = ({
       letterSpacing: "-0.02em",
       margin: "0 0 6px"
     }
-  }, "Stash"), /*#__PURE__*/React.createElement("p", {
+  }, "Squirrel"), /*#__PURE__*/React.createElement("p", {
     style: {
       fontFamily: "'Lora', serif",
       fontSize: "14px",
@@ -4006,7 +4006,7 @@ const LoginScreen = ({
       fontStyle: "italic",
       margin: 0
     }
-  }, "your personal memory bank")), /*#__PURE__*/React.createElement("div", {
+  }, "squirrel away your thoughts")), /*#__PURE__*/React.createElement("div", {
     style: {
       background: theme.cardBg,
       borderRadius: "20px",
@@ -4247,7 +4247,7 @@ function Stash() {
       loadDigestSettings();
     } catch (err) {
       console.error("[Auth] Failed to load stashes:", err.message);
-      setAuthError("Logged in, but couldn't load your stashes. Please refresh to try again.");
+      setAuthError("Logged in, but couldn't load your stash. Please refresh to try again.");
     } finally {
       setAuthLoading(false);
       setIsLoading(false);
@@ -4911,7 +4911,7 @@ function Stash() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `stash-selection-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `squirrel-selection-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -5115,7 +5115,7 @@ function Stash() {
           firedIds.add(item.id);
           // Fire a browser notification if we have permission
           if ("Notification" in window && Notification.permission === "granted") {
-            new Notification("Stash Reminder", {
+            new Notification("Squirrel Reminder", {
               body: item.content?.substring(0, 100) || "You have a reminder!",
               icon: "/icon-192.png"
             });
@@ -5271,7 +5271,7 @@ function Stash() {
         fontSize: "15px",
         transition: "background 0.4s ease"
       }
-    }, "opening your stash\u2026");
+    }, "Gathering your nuts...");
   }
 
   // Show login screen if not authenticated
@@ -5430,7 +5430,7 @@ function Stash() {
           setItems(serverData.stashes);
         }).catch(err => console.error("[Sync] Import failed:", err.message));
       } else {
-        alert("This doesn't look like a valid Stash backup file.");
+        alert("This doesn't look like a valid Squirrel backup file.");
       }
     },
     onLogout: handleLogout,
@@ -5640,7 +5640,7 @@ function Stash() {
       color: theme.textSecondary,
       letterSpacing: "0.04em"
     }
-  }, "Stash"), /*#__PURE__*/React.createElement("p", {
+  }, "Squirrel"), /*#__PURE__*/React.createElement("p", {
     style: {
       fontFamily: "'Lora', serif",
       fontSize: "13.5px",
@@ -5761,7 +5761,7 @@ function Stash() {
     value: inputValue,
     onChange: e => setInputValue(e.target.value),
     onKeyDown: handleKeyDown,
-    placeholder: pendingImage ? "Add a note about this photo…" : "What would you like to remember?",
+    placeholder: pendingImage ? "Add a note about this photo…" : "Something worth squirreling away?",
     rows: 1,
     style: {
       flex: 1,
@@ -5796,7 +5796,7 @@ function Stash() {
       whiteSpace: "nowrap",
       opacity: hasContent ? 1 : 0.7
     }
-  }, "Stash")), /*#__PURE__*/React.createElement("div", {
+  }, "Stash it")), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "6px 6px 4px",
       position: "relative"
@@ -6411,7 +6411,7 @@ function Stash() {
         link: "Paste a URL to save it here",
         contact: "Scan a business card or add contact info",
         travel: "Save flight details, hotel bookings, or trip ideas",
-        work: "Stash meeting notes, deadlines, or project ideas",
+        work: "Squirrel away meeting notes, deadlines, or project ideas",
         money: "Track expenses, invoices, or financial notes",
         health: "Log appointments, prescriptions, or wellness notes",
         media: "Save movie recs, podcast links, or playlist ideas",
@@ -6818,7 +6818,7 @@ function InstallBanner({
       color: theme.textPrimary,
       marginBottom: "2px"
     }
-  }, "Install Stash"), /*#__PURE__*/React.createElement("div", {
+  }, "Install Squirrel"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: "12px",
       color: theme.textMuted

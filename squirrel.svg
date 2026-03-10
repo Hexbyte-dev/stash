@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 180 240">
+  <!-- Background circle for icon use -->
+  <circle cx="90" cy="120" r="110" fill="#FAF7F2"/>
+
+  <!-- Tree hollow background -->
+  <ellipse cx="90" cy="135" rx="62" ry="75" fill="#6B5440" opacity="0.15"/>
+  <ellipse cx="90" cy="135" rx="50" ry="62" fill="#8B7355" opacity="0.1"/>
+
+  <!-- Tail -->
+  <path d="M 118 155 C 135 130 142 95 132 70 C 125 55 115 60 118 75 C 120 88 118 120 115 155" fill="#B07842"/>
+  <path d="M 118 145 C 132 125 138 95 130 75 C 125 62 118 66 120 78 C 122 88 120 115 118 145" fill="#C4956A" opacity="0.3"/>
+
+  <!-- Body -->
+  <ellipse cx="85" cy="155" rx="28" ry="35" fill="#B07842" transform="rotate(5 85 155)"/>
+  <ellipse cx="85" cy="158" rx="16" ry="22" fill="#DFC09A" opacity="0.5"/>
+
+  <!-- Head -->
+  <ellipse cx="82" cy="100" rx="26" ry="24" fill="#C08550" transform="rotate(-8 82 100)"/>
+
+  <!-- Soft rounded ears -->
+  <ellipse cx="59" cy="76" rx="8" ry="13" fill="#C08550" transform="rotate(-12 59 76)"/>
+  <ellipse cx="59" cy="74" rx="4.5" ry="7.5" fill="#E8C9A0" opacity="0.5" transform="rotate(-12 59 74)"/>
+  <ellipse cx="99" cy="74" rx="8" ry="13" fill="#C08550" transform="rotate(12 99 74)"/>
+  <ellipse cx="99" cy="72" rx="4.5" ry="7.5" fill="#E8C9A0" opacity="0.5" transform="rotate(12 99 72)"/>
+
+  <!-- Soft gentle eyes -->
+  <circle cx="72" cy="96" r="6.5" fill="white"/>
+  <circle cx="73" cy="96" r="4.5" fill="#4A3525"/>
+  <circle cx="71" cy="94" r="2.2" fill="white"/>
+  <circle cx="75" cy="98" r="0.8" fill="white" opacity="0.5"/>
+  <circle cx="93" cy="94" r="6" fill="white"/>
+  <circle cx="94" cy="94" r="4" fill="#4A3525"/>
+  <circle cx="92" cy="92" r="2" fill="white"/>
+  <circle cx="96" cy="96" r="0.8" fill="white" opacity="0.5"/>
+
+  <!-- Soft brows -->
+  <path d="M 66 90 Q 72 87 78 90" stroke="#A07040" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M 87 88 Q 93 85 99 88" stroke="#A07040" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+
+  <!-- Nose -->
+  <ellipse cx="82" cy="104" rx="3" ry="2.2" fill="#6B4530"/>
+  <!-- Smile -->
+  <path d="M 77 107 Q 82 112 87 107" stroke="#6B4530" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <!-- Cheeks -->
+  <circle cx="65" cy="103" r="5.5" fill="#E8B89D" opacity="0.3"/>
+  <circle cx="100" cy="101" r="5.5" fill="#E8B89D" opacity="0.3"/>
+
+  <!-- Left arm -->
+  <path d="M 65 134 C 60 140 60 146 65 152" stroke="#B07842" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Left paw -->
+  <ellipse cx="69" cy="153" rx="8" ry="6.5" fill="#C99B6A"/>
+  <circle cx="64" cy="150" r="3" fill="#D4A87A"/>
+  <circle cx="68" cy="148" r="3" fill="#D4A87A"/>
+  <circle cx="73" cy="148" r="3" fill="#D4A87A"/>
+  <ellipse cx="69" cy="155" rx="4" ry="2.5" fill="#B8845A" opacity="0.3"/>
+
+  <!-- Right arm -->
+  <path d="M 105 132 C 110 138 110 146 105 152" stroke="#B07842" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Right paw -->
+  <ellipse cx="101" cy="153" rx="8" ry="6.5" fill="#C99B6A"/>
+  <circle cx="106" cy="150" r="3" fill="#D4A87A"/>
+  <circle cx="102" cy="148" r="3" fill="#D4A87A"/>
+  <circle cx="97" cy="148" r="3" fill="#D4A87A"/>
+  <ellipse cx="101" cy="155" rx="4" ry="2.5" fill="#B8845A" opacity="0.3"/>
+
+  <!-- Acorn -->
+  <ellipse cx="85" cy="152" rx="7" ry="9" fill="#8B6914"/>
+  <path d="M 78 146 Q 85 140 92 146" fill="#6B4F12"/>
+  <circle cx="85" cy="140" r="2" fill="#6B4F12"/>
+
+  <!-- Feet -->
+  <ellipse cx="74" cy="190" rx="8" ry="4" fill="#B07842"/>
+  <ellipse cx="98" cy="191" rx="8" ry="4" fill="#B07842"/>
+</svg>

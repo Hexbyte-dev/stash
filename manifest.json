@@ -1,7 +1,7 @@
 {
-  "name": "Stash – Your Memory Bank",
-  "short_name": "Stash",
-  "description": "Capture and organize the things worth holding on to",
+  "name": "Squirrel — Squirrel Away Your Thoughts",
+  "short_name": "Squirrel",
+  "description": "Squirrel away your thoughts",
   "start_url": "./",
   "display": "standalone",
   "orientation": "portrait",
