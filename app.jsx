@@ -2394,7 +2394,7 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
             >{item.reminder ? "\u23F0" : "Remind"}</button>
             {displayImage && !item.ocrData && (
               <button
-                onClick={() => onScanCard(item.id)}
+                onClick={() => onScanCard(item.id, displayImage)}
                 disabled={isScanning}
                 style={{
                   background: "none", border: "none",
@@ -4036,12 +4036,25 @@ function Stash() {
 
   // Scan business card with OCR
   const [scanningId, setScanningId] = useState(null);
-  const scanBusinessCard = async (id) => {
+  const scanBusinessCard = async (id, imageData) => {
     const item = items.find(i => i.id === id);
-    if (!item?.image) return;
+    if (!item) return;
+
+    // Use provided image data (from lazy-loaded card), fall back to item.image,
+    // or fetch from server as last resort
+    let image = imageData || item.image;
+    if (!image) {
+      try {
+        const data = await apiFetch(`/api/stashes/${id}`);
+        image = data.stash?.image;
+      } catch (err) {
+        console.error("[Scan] Failed to fetch image:", err.message);
+      }
+    }
+    if (!image) return;
 
     setScanningId(id);
-    const cardData = await extractBusinessCard(item.image);
+    const cardData = await extractBusinessCard(image);
     setScanningId(null);
 
     if (cardData) {
