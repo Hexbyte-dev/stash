@@ -178,8 +178,8 @@ const builtInKeywords = {
   health: {
     pattern: /doctor|appointment|medicine|symptom|prescription|therapy|dentist|hospital|workout|vitamin/i
   },
-  media: {
-    pattern: /song|album|playlist|podcast|movie|show|watch|listen|series|episode|spotify|netflix/i
+  project: {
+    pattern: /project|milestone|deadline|sprint|roadmap|backlog|kanban|build|launch|ship/i
   },
   event: {
     pattern: /event|party|birthday|conference|concert|wedding|rsvp|invite|festival|ceremony|reunion/i
@@ -322,9 +322,9 @@ const themes = {
         color: "#B57EA0",
         bg: "#F5EBF2"
       },
-      media: {
-        color: "#BF8A5E",
-        bg: "#F8F0EB"
+      project: {
+        color: "#5E8ABF",
+        bg: "#EBF0F8"
       },
       event: {
         color: "#B5A05E",
@@ -422,9 +422,9 @@ const themes = {
         color: "#C898B5",
         bg: "#2E1E28"
       },
-      media: {
-        color: "#D4A07A",
-        bg: "#2E2518"
+      project: {
+        color: "#7AA0D4",
+        bg: "#182530"
       },
       event: {
         color: "#C8B87A",
@@ -486,9 +486,9 @@ const typeLabels = {
     icon: "♡",
     label: "Health"
   },
-  media: {
-    icon: "♪",
-    label: "Media"
+  project: {
+    icon: "▣",
+    label: "Project"
   },
   event: {
     icon: "☆",
@@ -533,8 +533,8 @@ const TYPE_COLORS = {
   // forest green
   health: "#A8555B",
   // dusty rose
-  media: "#7B6B8A",
-  // muted purple (same as reading)
+  project: "#5E7B8A",
+  // muted steel blue
   event: "#C9A84C",
   // golden (same as idea)
   recommended: "#5BA88F" // teal green (same as photo)
@@ -1473,7 +1473,7 @@ const SettingsPanel = ({
       // Fix #16: Prevent custom category IDs from colliding with
       // built-in types (e.g. a category called "Note" would clash
       // with the built-in "note" type) or existing custom categories
-      const builtInTypes = ["note", "link", "task", "event", "contact", "address", "code", "photo", "finance", "recipe", "health", "recommended", "reading", "food", "idea", "person", "travel", "work", "money", "media"];
+      const builtInTypes = ["note", "link", "task", "event", "contact", "address", "code", "photo", "finance", "recipe", "health", "recommended", "reading", "food", "idea", "person", "travel", "work", "money", "project"];
       let newId = cat.label.toLowerCase().replace(/\s+/g, "_");
       if (builtInTypes.includes(newId)) {
         newId = "custom_" + newId; // prefix to avoid collision
@@ -6414,7 +6414,7 @@ function Stash() {
         work: "Squirrel away meeting notes, deadlines, or project ideas",
         money: "Track expenses, invoices, or financial notes",
         health: "Log appointments, prescriptions, or wellness notes",
-        media: "Save movie recs, podcast links, or playlist ideas",
+        project: "Track project ideas, milestones, or things to build",
         event: "Remember dates, parties, or upcoming plans",
         reading: "Bookmark articles, books, or things to read later",
         food: "Save recipes, restaurant names, or meal plans",
