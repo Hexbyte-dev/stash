@@ -5649,7 +5649,7 @@ function Stash() {
       fontStyle: "italic",
       opacity: 0.85
     }
-  }, "the things worth holding on to")), /*#__PURE__*/React.createElement("div", {
+  }, "squirrel away your thoughts")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: "8px"

@@ -4562,7 +4562,7 @@ function Stash() {
               fontFamily: "'Lora', serif", fontSize: "13.5px",
               color: theme.textGhost, margin: 0, fontStyle: "italic",
               opacity: 0.85,
-            }}>the things worth holding on to</p>
+            }}>squirrel away your thoughts</p>
           </div>
           {/* Wrap both header buttons in a flex container so they sit
               side-by-side with a small gap between them */}
