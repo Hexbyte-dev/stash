@@ -2351,6 +2351,25 @@ const StashCard = ({
   const [editTags, setEditTags] = useState(item.tags.join(", "));
   const [copied, setCopied] = useState(false);
   const editRef = useRef(null);
+
+  // Lazy-load image for photo stashes. The list endpoint excludes
+  // image data for performance, so we fetch it on demand when the
+  // card mounts and the item has type "photo" but no image yet.
+  const [lazyImage, setLazyImage] = useState(null);
+  const [imageLoading, setImageLoading] = useState(false);
+  useEffect(() => {
+    if (item.type === "photo" && !item.image && !lazyImage && !imageLoading) {
+      setImageLoading(true);
+      apiFetch(`/api/stashes/${item.id}`).then(data => {
+        if (data.stash?.image) {
+          setLazyImage(data.stash.image);
+        }
+      }).catch(err => console.error("[Lazy Image]", err.message)).finally(() => setImageLoading(false));
+    }
+  }, [item.id, item.type, item.image, lazyImage, imageLoading]);
+
+  // Use the item's image if present, otherwise the lazy-loaded one
+  const displayImage = item.image || lazyImage;
   const isContact = item.type === "contact" || item.type === "person" || item.ocrData;
   const copyToClipboard = async () => {
     try {
@@ -2393,7 +2412,7 @@ const StashCard = ({
   };
   const saveEdit = () => {
     const newContent = editContent.trim();
-    if (!newContent && !item.image) {
+    if (!newContent && !displayImage) {
       cancelEditing();
       return;
     }
@@ -2403,7 +2422,7 @@ const StashCard = ({
     onEdit(item.id, {
       content: newContent,
       tags: newTags,
-      type: item.image ? "photo" : detectType(newContent, customCategories)
+      type: displayImage ? "photo" : detectType(newContent, customCategories)
     });
     setIsEditing(false);
   };
@@ -2570,11 +2589,11 @@ const StashCard = ({
   }, "\u23F0 ", new Date(item.reminder).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric"
-  }))), item.image && /*#__PURE__*/React.createElement("div", {
-    onClick: () => !isEditing && onViewImage(item.image),
+  }))), (displayImage || imageLoading) && /*#__PURE__*/React.createElement("div", {
+    onClick: () => !isEditing && displayImage && onViewImage(displayImage),
     style: {
       marginBottom: "10px",
-      cursor: isEditing ? "default" : "zoom-in",
+      cursor: isEditing ? "default" : displayImage ? "zoom-in" : "default",
       borderRadius: "12px",
       overflow: "hidden",
       maxWidth: "280px",
@@ -2583,8 +2602,8 @@ const StashCard = ({
       opacity: isCompleted ? 0.7 : 1,
       position: "relative"
     }
-  }, /*#__PURE__*/React.createElement("img", {
-    src: item.image,
+  }, displayImage ? /*#__PURE__*/React.createElement("img", {
+    src: displayImage,
     alt: item.content || "Squirreled image",
     style: {
       width: "100%",
@@ -2592,7 +2611,20 @@ const StashCard = ({
       maxHeight: "200px",
       objectFit: "cover"
     }
-  }), isScanning && /*#__PURE__*/React.createElement("div", {
+  }) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: "100%",
+      height: "120px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: theme.hoverBg,
+      color: theme.textFaint,
+      fontFamily: "'DM Sans', sans-serif",
+      fontSize: "13px",
+      fontStyle: "italic"
+    }
+  }, "Loading photo..."), isScanning && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "absolute",
       top: 0,
@@ -3070,7 +3102,7 @@ const StashCard = ({
       }
     },
     title: item.reminder ? `Reminder: ${new Date(item.reminder).toLocaleString()}` : "Set reminder"
-  }, item.reminder ? "\u23F0" : "Remind"), item.image && !item.ocrData && /*#__PURE__*/React.createElement("button", {
+  }, item.reminder ? "\u23F0" : "Remind"), displayImage && !item.ocrData && /*#__PURE__*/React.createElement("button", {
     onClick: () => onScanCard(item.id),
     disabled: isScanning,
     style: {

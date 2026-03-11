@@ -1729,6 +1729,28 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
   const [copied, setCopied] = useState(false);
   const editRef = useRef(null);
 
+  // Lazy-load image for photo stashes. The list endpoint excludes
+  // image data for performance, so we fetch it on demand when the
+  // card mounts and the item has type "photo" but no image yet.
+  const [lazyImage, setLazyImage] = useState(null);
+  const [imageLoading, setImageLoading] = useState(false);
+  useEffect(() => {
+    if (item.type === "photo" && !item.image && !lazyImage && !imageLoading) {
+      setImageLoading(true);
+      apiFetch(`/api/stashes/${item.id}`)
+        .then(data => {
+          if (data.stash?.image) {
+            setLazyImage(data.stash.image);
+          }
+        })
+        .catch(err => console.error("[Lazy Image]", err.message))
+        .finally(() => setImageLoading(false));
+    }
+  }, [item.id, item.type, item.image, lazyImage, imageLoading]);
+
+  // Use the item's image if present, otherwise the lazy-loaded one
+  const displayImage = item.image || lazyImage;
+
   const isContact = item.type === "contact" || item.type === "person" || item.ocrData;
 
   const copyToClipboard = async () => {
@@ -1775,7 +1797,7 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
 
   const saveEdit = () => {
     const newContent = editContent.trim();
-    if (!newContent && !item.image) { cancelEditing(); return; }
+    if (!newContent && !displayImage) { cancelEditing(); return; }
     
     // Parse tags: support both "tag1, tag2" and "#tag1 #tag2" formats
     const newTags = editTags
@@ -1786,7 +1808,7 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
     onEdit(item.id, {
       content: newContent,
       tags: newTags,
-      type: item.image ? "photo" : detectType(newContent, customCategories),
+      type: displayImage ? "photo" : detectType(newContent, customCategories),
     });
     setIsEditing(false);
   };
@@ -1941,11 +1963,11 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
           </div>
 
           {/* Image */}
-          {item.image && (
+          {(displayImage || imageLoading) && (
             <div
-              onClick={() => !isEditing && onViewImage(item.image)}
+              onClick={() => !isEditing && displayImage && onViewImage(displayImage)}
               style={{
-                marginBottom: "10px", cursor: isEditing ? "default" : "zoom-in",
+                marginBottom: "10px", cursor: isEditing ? "default" : displayImage ? "zoom-in" : "default",
                 borderRadius: "12px", overflow: "hidden",
                 maxWidth: "280px", border: `1px solid ${theme.border}`,
                 transition: "all 0.3s ease",
@@ -1953,9 +1975,19 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
                 position: "relative",
               }}
             >
-              <img src={item.image} alt={item.content || "Squirreled image"}
-                style={{ width: "100%", display: "block", maxHeight: "200px", objectFit: "cover" }}
-              />
+              {displayImage ? (
+                <img src={displayImage} alt={item.content || "Squirreled image"}
+                  style={{ width: "100%", display: "block", maxHeight: "200px", objectFit: "cover" }}
+                />
+              ) : (
+                <div style={{
+                  width: "100%", height: "120px", display: "flex",
+                  alignItems: "center", justifyContent: "center",
+                  background: theme.hoverBg, color: theme.textFaint,
+                  fontFamily: "'DM Sans', sans-serif", fontSize: "13px",
+                  fontStyle: "italic",
+                }}>Loading photo...</div>
+              )}
               {isScanning && (
                 <div style={{
                   position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
@@ -2337,7 +2369,7 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
               onMouseLeave={e => { if (!item.reminder) { e.currentTarget.style.color = theme.textGhost; e.currentTarget.style.background = "none"; } }}
               title={item.reminder ? `Reminder: ${new Date(item.reminder).toLocaleString()}` : "Set reminder"}
             >{item.reminder ? "\u23F0" : "Remind"}</button>
-            {item.image && !item.ocrData && (
+            {displayImage && !item.ocrData && (
               <button
                 onClick={() => onScanCard(item.id)}
                 disabled={isScanning}
