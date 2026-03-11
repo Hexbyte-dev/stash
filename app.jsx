@@ -4642,7 +4642,7 @@ function Stash() {
               value={inputValue}
               onChange={e => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={pendingImage ? "Add a note about this photo…" : "Something worth squirreling away?"}
+              placeholder={pendingImage ? "Add a note about this photo…" : "Tuck something away..."}
               rows={1}
               style={{
                 flex: 1, background: "none", border: "none",
