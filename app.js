@@ -337,41 +337,45 @@ const themes = {
     }
   },
   dark: {
-    // Backgrounds — rich, warm darks (not cold blue-black)
-    pageBg: "#1C1A17",
-    cardBg: "#262320",
-    inputBg: "#262320",
-    searchBg: "#222019",
-    settingsBg: "#262320",
-    overlayBg: "rgba(28, 26, 23, 0.94)",
-    hoverBg: "#2E2B27",
-    completedBg: "#21201C",
-    // Borders
-    border: "#3A3530",
-    borderHover: "#4A443D",
-    // Text
-    textPrimary: "#D4CFC8",
-    textSecondary: "#A89E94",
-    textMuted: "#A09890",
+    // Backgrounds — layered warm darks for visual depth
+    // Layer 0 (deepest): page background
+    // Layer 1 (mid): search bar, settings panel
+    // Layer 2 (surface): cards, input area
+    // Layer 3 (elevated): hover states
+    pageBg: "#151311",
+    cardBg: "#2A2622",
+    inputBg: "#2A2622",
+    searchBg: "#1E1C18",
+    settingsBg: "#1E1C18",
+    overlayBg: "rgba(21, 19, 17, 0.95)",
+    hoverBg: "#332F2A",
+    completedBg: "#1A1816",
+    // Borders — slightly more visible for separation
+    border: "#3D3832",
+    borderHover: "#524B43",
+    // Text — slightly brighter for readability
+    textPrimary: "#DCD7D0",
+    textSecondary: "#B5AA9E",
+    textMuted: "#A89D94",
     // timestamps, secondary labels
-    textFaint: "#8A827A",
+    textFaint: "#8E857C",
     // placeholders, tips
-    textGhost: "#787068",
+    textGhost: "#7A7168",
     // filter labels, faintest UI text
     // Accents
-    accent: "#D4CFC8",
-    accentGradient: "linear-gradient(145deg, #A89E94, #7E756B)",
-    disabledBg: "#3A3530",
-    disabledText: "#8A827A",
+    accent: "#DCD7D0",
+    accentGradient: "linear-gradient(145deg, #B5AA9E, #8A7F74)",
+    disabledBg: "#3D3832",
+    disabledText: "#8E857C",
     checkColor: "#7EB5A0",
     checkBg: "#1E2E28",
     deleteColor: "#C48B8B",
     deleteBg: "#2E2222",
-    // Shadows
-    shadowLight: "0 1px 3px rgba(0, 0, 0, 0.12)",
-    shadowMedium: "0 2px 12px rgba(0, 0, 0, 0.15)",
-    shadowHover: "0 4px 20px rgba(0, 0, 0, 0.2)",
-    shadowImage: "0 12px 48px rgba(0, 0, 0, 0.4)",
+    // Shadows — stronger for dark mode depth
+    shadowLight: "0 1px 4px rgba(0, 0, 0, 0.25)",
+    shadowMedium: "0 3px 16px rgba(0, 0, 0, 0.3)",
+    shadowHover: "0 6px 24px rgba(0, 0, 0, 0.35)",
+    shadowImage: "0 12px 48px rgba(0, 0, 0, 0.5)",
     // Category colors — slightly brighter for dark bg contrast
     types: {
       note: {
@@ -620,7 +624,7 @@ const getTypeColors = (type, theme, customCategories = []) => {
   if (custom) {
     const palette = customColorPalette[custom.colorIndex % customColorPalette.length];
     // Detect dark mode by checking background color
-    const isDark = theme.pageBg === "#1C1A17";
+    const isDark = theme.pageBg === "#151311";
     return isDark ? palette.dark : palette.light;
   }
   return theme.types.note;
@@ -2438,7 +2442,7 @@ const StashCard = ({
   return /*#__PURE__*/React.createElement("div", {
     onClick: bulkMode ? () => onToggleBulkSelect(item.id) : undefined,
     style: {
-      background: isEditing ? theme.cardBg : isSelected ? theme.pageBg === "#1C1A17" ? "#2A2724" : "#F0EDE6" : isCompleted ? theme.completedBg : theme.cardBg,
+      background: isEditing ? theme.cardBg : isSelected ? theme.pageBg === "#151311" ? "#2A2724" : "#F0EDE6" : isCompleted ? theme.completedBg : theme.cardBg,
       borderRadius: "16px",
       padding: "16px 18px",
       marginBottom: "8px",
@@ -5661,7 +5665,7 @@ function Stash() {
       justifyContent: "space-between",
       paddingBottom: "20px",
       borderBottom: `1px solid ${theme.border}`,
-      backgroundImage: theme.pageBg === "#1C1A17" ? "none" : "linear-gradient(180deg, rgba(250,247,242,0) 60%, rgba(237,232,224,0.3) 100%)"
+      backgroundImage: theme.pageBg === "#151311" ? "none" : "linear-gradient(180deg, rgba(250,247,242,0) 60%, rgba(237,232,224,0.3) 100%)"
     }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", {
     style: {
@@ -5670,9 +5674,19 @@ function Stash() {
       fontWeight: 400,
       margin: "0 0 4px",
       color: theme.textSecondary,
-      letterSpacing: "0.04em"
+      letterSpacing: "0.04em",
+      display: "flex",
+      alignItems: "center",
+      gap: "10px"
     }
-  }, "Squirrel"), /*#__PURE__*/React.createElement("p", {
+  }, /*#__PURE__*/React.createElement("img", {
+    src: "squirrel.svg",
+    alt: "",
+    style: {
+      width: "36px",
+      height: "36px"
+    }
+  }), "Squirrel"), /*#__PURE__*/React.createElement("p", {
     style: {
       fontFamily: "'Lora', serif",
       fontSize: "13.5px",
@@ -5730,7 +5744,7 @@ function Stash() {
     }
   }, "Settings"))), /*#__PURE__*/React.createElement("div", {
     style: {
-      background: theme.pageBg === "#1C1A17" ? theme.inputBg : "#FFFDF9",
+      background: theme.pageBg === "#151311" ? theme.inputBg : "#FFFDF9",
       borderRadius: "16px",
       border: `1px solid ${pendingImage ? theme.borderHover : theme.border}`,
       padding: "4px",
