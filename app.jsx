@@ -1735,11 +1735,29 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
 
   // Lazy-load image for photo stashes. The list endpoint excludes
   // image data for performance, so we fetch it on demand when the
-  // card mounts and the item has type "photo" but no image yet.
+  // card scrolls into view (using IntersectionObserver). This avoids
+  // blasting the server with requests for every photo card at once.
   const [lazyImage, setLazyImage] = useState(null);
   const [imageLoading, setImageLoading] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const cardRef = useRef(null);
+
+  // Watch for the card entering the viewport
   useEffect(() => {
-    if (item.type === "photo" && !item.image && !lazyImage && !imageLoading) {
+    if (item.type !== "photo" || item.image) return;
+    const el = cardRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setIsVisible(true); observer.disconnect(); } },
+      { rootMargin: "200px" } // start loading a bit before it's visible
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [item.type, item.image]);
+
+  // Fetch image data once visible
+  useEffect(() => {
+    if (isVisible && item.type === "photo" && !item.image && !lazyImage && !imageLoading) {
       setImageLoading(true);
       apiFetch(`/api/stashes/${item.id}`)
         .then(data => {
@@ -1750,7 +1768,7 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
         .catch(err => console.error("[Lazy Image]", err.message))
         .finally(() => setImageLoading(false));
     }
-  }, [item.id, item.type, item.image, lazyImage, imageLoading]);
+  }, [isVisible, item.id, item.type, item.image, lazyImage, imageLoading]);
 
   // Use the item's image if present, otherwise the lazy-loaded one
   const displayImage = item.image || lazyImage;
@@ -1824,6 +1842,7 @@ const StashCard = ({ item, onDelete, onToggleComplete, onEdit, onViewImage, onTo
 
   return (
     <div
+      ref={cardRef}
       onClick={bulkMode ? () => onToggleBulkSelect(item.id) : undefined}
       style={{
       background: isEditing ? theme.cardBg : (isSelected ? (theme.pageBg === "#151311" ? "#2A2724" : "#F0EDE6") : (isCompleted ? theme.completedBg : theme.cardBg)),
